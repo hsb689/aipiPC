@@ -1,0 +1,19 @@
+# Build artifacts
+/target/
+/dist/
+node_modules/
+*.exe
+*.dll
+*.msi
+*.wixpdb
+
+# Rust
+Cargo.lock
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
