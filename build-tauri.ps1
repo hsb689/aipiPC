@@ -11,6 +11,10 @@ if ($Clean) {
     exit 0
 }
 
+# Force cargo to re-embed frontend assets: incremental build only tracks
+# Rust sources, so HTML changes alone are invisible to generate_context!
+(Get-Item 'src/main.rs').LastWriteTime = Get-Date
+
 npx tauri build
 if ($LASTEXITCODE -ne 0) {
     Write-Host '[ERROR] Build failed.' -ForegroundColor Red
