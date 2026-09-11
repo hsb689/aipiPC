@@ -109,28 +109,42 @@ async fn ble_connect(
         target.subscribe(ch).await.map_err(|e| format!("subscribe: {e}"))?;
     }
 
+    // Monitor connection via notification stream ending (most reliable)
+    let app_clone2 = app.clone();
+    let state_monitor = state.inner().clone();
     tokio::spawn(async move {
         use futures::stream::StreamExt;
         while let Some(event) = events.next().await {
-            let _ = app_clone.emit("ble-notify", event.value);
+            let _ = app_clone2.emit("ble-notify", event.value);
         }
+        // Stream ended = connection lost
+        let _ = app_clone2.emit("ble-disconnected", ());
+        let mut s = state_monitor.lock().await;
+        s.peripheral = None;
+        s.connected = false;
     });
 
-    // Monitor connection health - detect device power-off / disconnect
-    let p_monitor = target.clone();
-    let app_monitor = app.clone();
-    let state_monitor = state.inner().clone();
+    // Poll-based health check: Windows may not end the notification stream
+    // when the device powers off. Require 3 consecutive failures (~6s) to
+    // avoid false positives seen with is_connected() on WinRT.
+    let p_health = target.clone();
+    let app_health = app.clone();
+    let state_health = state.inner().clone();
     tokio::spawn(async move {
+        let mut fails = 0u32;
         loop {
             tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-            match p_monitor.is_connected().await {
-                Ok(true) => {}
+            match p_health.is_connected().await {
+                Ok(true) => fails = 0,
                 _ => {
-                    let _ = app_monitor.emit("ble-disconnected", ());
-                    let mut s = state_monitor.lock().await;
-                    s.peripheral = None;
-                    s.connected = false;
-                    break;
+                    fails += 1;
+                    if fails >= 3 {
+                        let _ = app_health.emit("ble-disconnected", ());
+                        let mut s = state_health.lock().await;
+                        s.peripheral = None;
+                        s.connected = false;
+                        break;
+                    }
                 }
             }
         }
