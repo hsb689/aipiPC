@@ -119,6 +119,9 @@ body {
 .btn-row { display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; }
 .preset-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin-top:10px; }
 .const-layout { display:flex; gap:12px; height:clamp(180px,32vh,320px); }
+.const-layout.reflow { height:clamp(280px,52vh,520px); }
+.const-layout.reflow .const-side { gap:8px; justify-content:flex-start; }
+.const-layout.reflow .temp-card { padding:8px 12px; flex:1; display:flex; flex-direction:column; justify-content:center; }
 .const-chart { flex:1; min-width:0; background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:8px; box-sizing:border-box; height:100%; }
 .const-chart canvas { width:100%!important; height:100%!important; display:block; }
 .const-side { width:170px; flex-shrink:0; display:flex; flex-direction:column; justify-content:space-around; }
@@ -175,7 +178,6 @@ body {
       <option value="dark">🌙 深色</option>
     </select>
     <button class="btn btn-primary" id="btnConn">连接设备</button>
-    <button class="btn btn-danger" id="btnDisc" disabled>断开</button>
   </div>
 </div>
 <div class="main">
@@ -186,6 +188,8 @@ body {
       <div class="chip"><span class="chip-label">输出电压</span><span class="chip-val" id="vOut">-- V</span></div>
       <div class="chip"><span class="chip-label">输出电流</span><span class="chip-val" id="iOut">-- mA</span></div>
       <div class="chip"><span class="chip-label">加热片电阻</span><span class="chip-val" id="res">-- Ω</span></div>
+      <div class="chip"><span class="chip-label">VPWM</span><span class="chip-val" id="vpwm">--%</span></div>
+      <div class="chip"><span class="chip-label">IPWM</span><span class="chip-val" id="ipwm">--%</span></div>
     </div>
     <div class="card">
       <div class="card-title">连接信息</div>
@@ -227,13 +231,35 @@ body {
       </div>
     </div>
     <div class="card" id="viewReflow" style="display:none;">
-      <div class="card-title">回流焊曲线</div>
-      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:8px;">
-        <canvas id="curveCanvas" width="600" height="220" style="width:100%;height:auto;display:block;"></canvas>
+      <div class="const-layout reflow">
+        <div class="const-chart">
+          <canvas id="curveCanvas" width="600" height="220"></canvas>
+        </div>
+        <div class="const-side">
+          <div class="temp-card" style="flex:0 0 auto;">
+            <div class="temp-label">实时温度</div>
+            <div><span class="temp-big" id="curTempR">--.-</span><span class="temp-unit">℃</span></div>
+          </div>
+          <div class="temp-card">
+            <div class="temp-label">阶段1 预热</div>
+            <div class="target-val" id="rfPhase1">-- ℃ / --s</div>
+          </div>
+          <div class="temp-card">
+            <div class="temp-label">阶段2 恒温</div>
+            <div class="target-val" id="rfPhase2">-- ℃ / --s</div>
+          </div>
+          <div class="temp-card">
+            <div class="temp-label">阶段3 回流</div>
+            <div class="target-val" id="rfPhase3">-- ℃ / --s</div>
+          </div>
+          <div class="temp-card">
+            <div class="temp-label">阶段4 冷却</div>
+            <div class="target-val" style="font-size:clamp(12px,1vw,16px);">回落至常温</div>
+          </div>
+          <button class="btn btn-primary" id="btnHeatR" style="width:100%">开启加热</button>
+        </div>
       </div>
-      <div id="reflowPhases" style="margin-top:8px;"></div>
       <div class="btn-row" style="margin-top:10px;">
-        <button class="btn btn-primary" id="btnHeatR">开启加热</button>
         <button class="btn btn-ghost" id="btnRefreshCurve">刷新曲线</button>
       </div>
     </div>
@@ -243,6 +269,16 @@ body {
         <button class="btn btn-ghost" id="btnClearLog" style="padding:3px 8px;font-size:11px;">清空</button>
       </div>
       <div class="log-box" id="logBox"></div>
+    </div>
+    <div class="card" id="pwmCard" style="display:none;">
+      <div class="card-title">PWM 占空比 (5分钟)</div>
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:8px;height:clamp(140px,20vh,200px);">
+        <canvas id="pwmChart" width="600" height="150" style="width:100%;height:100%;display:block;"></canvas>
+      </div>
+      <div style="display:flex;gap:16px;margin-top:8px;font-size:12px;">
+        <span><span style="color:#ff453a;">●</span> VPWM: <strong id="pwmLegendV">--%</strong></span>
+        <span><span style="color:#0a84ff;">●</span> IPWM: <strong id="pwmLegendI">--%</strong></span>
+      </div>
     </div>
   </div>
   <div class="col col-right">
@@ -316,11 +352,17 @@ const CMD={SET_WORK_MODE:0x00,SET_TARGET_TEMP:0x01,SET_PRESET1:0x02,SET_PRESET2:
   RF_PREHEAT_TM:0x13,RF_KEEP_TM:0x14,RF_REFLOW_TM:0x15,PID_KP:0x20,PID_KI:0x21,PID_KD:0x22,
   POWER_LIMIT:0x26,SAVE:0xF0,LOAD_DEFAULT:0xF1,REBOOT:0xF2};
 const SID={CUR_TEMP:0x40,SET_TEMP:0x41,HEATER:0x42,VIN:0x43,MODE:0x47,WORK_SEC:0x48,PWR:0x49,
-  VOUT:0x4A,IOUT:0x4B,RES:0x4C,SUMMARY:0x4F,SUM_B:0x57,ELEC:0x58,
+  VOUT:0x4A,IOUT:0x4B,RES:0x4C,VPWM:0x4D,IPWM:0x4E,SUMMARY:0x4F,SUM_B:0x57,ELEC:0x58,
   CFG_BASIC_A:0x50,CFG_BASIC_B:0x51,CFG_OTHER:0x52,CFG_REFLOW_A:0x53,CFG_REFLOW_B:0x54,CFG_HEATER:0x59};
 const DT={CONFIG:0x02,STATUS:0x03,U8:0x10,U16:0x11,I16:0x12,U32:0x13,FLOAT:0x14};
 
-let connected=false, heating=false, workMode=0;
+let connected=false, heating=false, workMode=0, scanning=false, vpwmDuty=0, ipwmDuty=0;
+const ENABLE_PWM_DISPLAY=true;
+function calcRes(){
+  const v=parseFloat($('vOut').textContent), i=parseFloat($('iOut').textContent);
+  if(isNaN(v)||isNaN(i)||i<=0){$('res').textContent='-- Ω';return;}
+  $('res').textContent=(v/i).toFixed(2)+' Ω';
+}
 const stickyMap={};
 
 function log(type, msg, stickyKey) {
@@ -376,16 +418,18 @@ function parseSummary(b){
   while(o+1<b.length){
     const fid=b[o],flen=b[o+1]; if(o+1+flen>b.length)break;
     const d=b.slice(o+2,o+2+flen);
+    try{
     switch(fid){
-      case SID.CUR_TEMP: if(flen>=2){const v=d[0]|(d[1]<<8);$('curTemp').textContent=v;} break;
+      case SID.CUR_TEMP: if(flen>=2){const v=d[0]|(d[1]<<8);$('curTemp').textContent=v;const er=$('curTempR');if(er)er.textContent=v;} break;
       case SID.SET_TEMP: if(flen>=2){const v=d[0]|(d[1]<<8);$('setTemp').textContent=v+' ℃';$('cvTarget').textContent=v;} break;
       case SID.HEATER: heating=d[0]===1; updateHeatBtn(); break;
       case SID.MODE: workMode=d[0]; updateModeUI(); break;
       case SID.VIN: if(flen>=2){const v=(d[0]|(d[1]<<8))/100;$('vIn').textContent=v.toFixed(2)+' V';} break;
       case SID.PWR: if(flen>=2){const v=(d[0]|(d[1]<<8))/100;$('pwr').textContent=v.toFixed(1)+' W';} break;
-      case SID.VOUT: if(flen>=2){const v=(d[0]|(d[1]<<8))/100;$('vOut').textContent=v.toFixed(2)+' V';} break;
-      case SID.IOUT: if(flen>=2){const v=(d[0]|(d[1]<<8))/100;$('iOut').textContent=v.toFixed(2)+' A';} break;
-      case SID.RES: if(flen>=2){let r=d[0]|(d[1]<<8);if(r>32767)r-=65536;if(r===-1)$('res').textContent='OC';else if(r===0)$('res').textContent='SC';else $('res').textContent=(r/100).toFixed(2)+' Ω';} break;
+      case SID.VOUT: if(flen>=2){const v=(d[0]|(d[1]<<8))/100;$('vOut').textContent=v.toFixed(2)+' V';calcRes();} break;
+      case SID.IOUT: if(flen>=2){const v=(d[0]|(d[1]<<8))/100;$('iOut').textContent=v.toFixed(2)+' A';calcRes();} break;
+      case SID.VPWM: if(ENABLE_PWM_DISPLAY&&flen>=1){vpwmDuty=d[0];const el=$('vpwm');if(el)el.textContent=d[0]+'%';} break;
+      case SID.IPWM: if(ENABLE_PWM_DISPLAY&&flen>=1){ipwmDuty=d[0];const el=$('ipwm');if(el)el.textContent=d[0]+'%';} break;
       // Config fields (from config group frames)
       case CMD.SET_TARGET_TEMP: if(flen>=2){const v=d[0]|(d[1]<<8);$('cvTarget').textContent=v;$('setTemp').textContent=v+' ℃';$('iTarget').value=v;} break;
       case CMD.SET_PRESET1: if(flen>=2){const v=d[0]|(d[1]<<8);$('cvP1').textContent=v;$('p1v').textContent=v;$('iP1').value=v;} break;
@@ -404,6 +448,7 @@ function parseSummary(b){
       case CMD.SET_TCOMP: if(flen>=2){let v=d[0]|(d[1]<<8);if(v>32767)v-=65536;$('cvTcomp').textContent=v;$('iTcomp').value=v;} break;
       case CMD.SET_ASHUT: if(flen>=4){const v=(d[0]|(d[1]<<8)|(d[2]<<16)|(d[3]<<24))>>>0;$('cvAoff').textContent=v;$('iAoff').value=v;} break;
     }
+    }catch(e){}
     o+=2+flen;
   }
   const temp=parseFloat($('curTemp').textContent);
@@ -455,6 +500,17 @@ function updateModeUI(){
 
 // BLE connect / disconnect
 $('btnConn').addEventListener('click', async()=>{
+  if(connected){
+    try{await invoke('ble_disconnect');}catch(e){}
+    connected=false; heating=false;
+    $('dot').classList.remove('on');
+    $('connText').textContent='未连接';
+    $('infoDev').textContent='-';
+    $('btnConn').textContent='连接设备'; $('btnConn').className='btn btn-primary';
+    updateHeatBtn();
+    log('disconnect','已断开');
+    return;
+  }
   log('info','正在扫描蓝牙设备...');
   try{
     let devs=await invoke('ble_scan');
@@ -472,7 +528,7 @@ $('btnConn').addEventListener('click', async()=>{
       connected=false; heating=false;
       $('dot').classList.remove('on');
       $('connText').textContent='设备已断开';
-      $('btnDisc').disabled=true;
+      $('btnConn').textContent='连接设备'; $('btnConn').className='btn btn-primary';
       updateHeatBtn();
       log('error','设备已断开连接');
     });
@@ -480,22 +536,11 @@ $('btnConn').addEventListener('click', async()=>{
     connected=true;
     $('dot').classList.add('on');
     $('connText').textContent='已连接: '+name;
-    $('btnDisc').disabled=false;
+    $('btnConn').textContent='断开连接'; $('btnConn').className='btn btn-danger';
     $('infoDev').textContent=name;
     log('connect','BLE 已连接');
-    // Trigger device to resend config frames
     setTimeout(async()=>{try{await invoke('ble_write',{data:[0xF0,0x00]});}catch(e){}},100);
   }catch(e){log('error','连接失败: '+e);}
-});
-$('btnDisc').addEventListener('click', async()=>{
-  try{await invoke('ble_disconnect');}catch(e){}
-  connected=false; heating=false;
-  $('dot').classList.remove('on');
-  $('connText').textContent='未连接';
-  $('btnDisc').disabled=true;
-  $('infoDev').textContent='-';
-  updateHeatBtn();
-  log('disconnect','已断开');
 });
 
 // Heater toggle
@@ -561,13 +606,13 @@ document.querySelectorAll('.tab').forEach(tab=>{
 
 // Temperature chart (5 min rolling)
 const tempData=[], MAX_PTS=300;
+const pwmVData=[], pwmIData=[];
 function drawTempChart(){
   const c=$('tempChart'); if(!c)return;
-  const container=c.parentElement;
-  const containerW=container?container.offsetWidth:600;
-  const containerH=container?container.offsetHeight:200;
-  if(containerW<50||containerH<50)return;
-  c.width=Math.floor(containerW-16); c.height=Math.floor(containerH-16);
+  const rect=c.getBoundingClientRect();
+  const cw=Math.floor(rect.width), ch=Math.floor(rect.height);
+  if(cw<50||ch<50)return;
+  c.width=cw; c.height=ch;
   const ctx=c.getContext('2d'), W=c.width, H=c.height;
   const L=45, R=10, T=10, B=24;
   const pw=W-L-R, ph=H-T-B;
@@ -613,17 +658,21 @@ function drawTempChart(){
 setInterval(()=>{
   const v=parseFloat($('curTemp').textContent);
   if(!isNaN(v)){tempData.push({v,t:Date.now()}); if(tempData.length>MAX_PTS)tempData.shift();}
+  if(ENABLE_PWM_DISPLAY){
+    pwmVData.push({v:vpwmDuty,t:Date.now()}); if(pwmVData.length>MAX_PTS)pwmVData.shift();
+    pwmIData.push({v:ipwmDuty,t:Date.now()}); if(pwmIData.length>MAX_PTS)pwmIData.shift();
+    drawPwmChart();
+  }
   drawTempChart();
 },1000);
 
 // Reflow curve
 function drawReflowCurve(){
   const c=$('curveCanvas'); if(!c)return;
-  const container=c.parentElement;
-  const containerW=container?container.offsetWidth:600;
-  const containerH=container?container.offsetHeight:250;
-  if(containerW<50||containerH<50)return;
-  c.width=Math.floor(containerW-16); c.height=Math.floor(containerH-16);
+  const rect=c.getBoundingClientRect();
+  const cw=Math.floor(rect.width), ch=Math.floor(rect.height);
+  if(cw<50||ch<50)return;
+  c.width=cw; c.height=ch;
   const ctx=c.getContext('2d'), W=c.width, H=c.height;
   const L=45, R=10, T=10, B=24;
   const pw=W-L-R, ph=H-T-B;
@@ -661,19 +710,66 @@ function drawReflowCurve(){
   ctx.fillText('回流 '+rt+'℃/'+rtt+'s',toX(ptt+ktt)+4,toY(rt)-4);
 }
 function drawReflowPhaseCards(){
-  const box=$('reflowPhases'); if(!box)return;
+  const e1=$('rfPhase1'),e2=$('rfPhase2'),e3=$('rfPhase3');
+  if(!e1||!e2||!e3)return;
   const pt=rd('iRfPT'),ptt=rd('iRfPTT'),kt=rd('iRfKT'),ktt=rd('iRfKTT'),rt=rd('iRfRT'),rtt=rd('iRfRTT');
-  box.innerHTML=`
-    <div class="chip"><span class="chip-label">阶段1 预热</span><span class="chip-val">${pt}℃ / ${ptt}s</span></div>
-    <div class="chip"><span class="chip-label">阶段2 恒温</span><span class="chip-val">${kt}℃ / ${ktt}s</span></div>
-    <div class="chip"><span class="chip-label">阶段3 回流</span><span class="chip-val">${rt}℃ / ${rtt}s</span></div>
-    <div class="chip"><span class="chip-label">阶段4 冷却</span><span class="chip-val">回落至常温</span></div>`;
+  e1.textContent=pt+' ℃ / '+ptt+'s';
+  e2.textContent=kt+' ℃ / '+ktt+'s';
+  e3.textContent=rt+' ℃ / '+rtt+'s';
 }
 $('btnRefreshCurve').addEventListener('click',()=>{drawReflowCurve();drawReflowPhaseCards();});
 ['iRfPT','iRfPTT','iRfKT','iRfKTT','iRfRT','iRfRTT'].forEach(id=>{
   $(id)?.addEventListener('input',()=>{drawReflowCurve();drawReflowPhaseCards();});
 });
 drawReflowCurve(); drawReflowPhaseCards();
+if(ENABLE_PWM_DISPLAY){$('pwmCard').style.display='';}
+
+// PWM chart
+function drawPwmChart(){
+  const c=$('pwmChart'); if(!c)return;
+  const rect=c.getBoundingClientRect();
+  const cw=Math.floor(rect.width), ch=Math.floor(rect.height);
+  if(cw<50||ch<50)return;
+  c.width=cw; c.height=ch;
+  const ctx=c.getContext('2d'), W=c.width, H=c.height;
+  const L=35, R=10, T=10, B=24;
+  const pw=W-L-R, ph=H-T-B;
+  ctx.clearRect(0,0,W,H);
+  if(pwmVData.length<2&&pwmIData.length<2){ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--fg3').trim();ctx.font='12px sans-serif';ctx.fillText('等待数据...',W/2-30,H/2);return;}
+  // Y axis 0~100%
+  const mn=0, mx=100, rng=mx-mn||1;
+  ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--fg2').trim()||'#86868b';
+  ctx.font='10px sans-serif'; ctx.textAlign='right'; ctx.textBaseline='middle';
+  for(let v=0;v<=100;v+=25){
+    const y=T+ph-(v-mn)/rng*ph;
+    ctx.fillText(v+'%',L-4,y);
+    ctx.strokeStyle='rgba(128,128,128,0.12)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(L,y);ctx.lineTo(W-R,y);ctx.stroke();
+  }
+  // X axis relative time
+  ctx.textAlign='center'; ctx.textBaseline='top';
+  for(let i=0;i<=5;i++){
+    const secAgo=300-i*60, x=L+(i/5)*pw;
+    const label=secAgo===0?'现在':(secAgo>=60?(secAgo/60)+'min':secAgo+'s');
+    ctx.fillText(label,x,H-B+4);
+  }
+  // draw curve
+  function drawLine(data,color){
+    if(data.length<2)return;
+    ctx.strokeStyle=color; ctx.lineWidth=1.5; ctx.beginPath();
+    const now=Date.now();
+    data.forEach((p,i)=>{
+      const x=L+((300-((now-p.t)/1000))/300)*pw;
+      const y=T+ph-(p.v-mn)/rng*ph;
+      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+  }
+  drawLine(pwmVData,'#ff453a');
+  drawLine(pwmIData,'#0a84ff');
+  // update legend
+  if($('pwmLegendV'))$('pwmLegendV').textContent=vpwmDuty+'%';
+  if($('pwmLegendI'))$('pwmLegendI').textContent=ipwmDuty+'%';
+}
 
 // Clear log
 $('btnClearLog').addEventListener('click',()=>{$('logBox').innerHTML='';for(const k in stickyMap)delete stickyMap[k];});
