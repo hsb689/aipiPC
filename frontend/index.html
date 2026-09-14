@@ -53,6 +53,31 @@ body {
   font-size:clamp(10px,0.9vw,13px);
   background: var(--bg3); color: var(--fg2);
 }
+.theme-sel {
+  -webkit-appearance:none; appearance:none;
+  padding:4px 26px 4px 12px; border-radius:16px;
+  font-size:clamp(10px,0.9vw,13px); font-family:inherit;
+  background:var(--bg3); color:var(--fg2); border:1px solid transparent;
+  cursor:pointer; outline:none; transition:border-color .15s, color .15s;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='%2386868b' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>");
+  background-repeat:no-repeat; background-position:right 10px center;
+}
+.theme-sel:hover { border-color:var(--border); color:var(--fg); }
+.theme-sel:focus { border-color:var(--accent); }
+.theme-sel option { background:var(--card); color:var(--fg); font-size:13px; }
+.switch { position:relative; display:inline-block; width:40px; height:22px; cursor:pointer; }
+.switch input { opacity:0; width:0; height:0; }
+.switch-track { position:absolute; inset:0; background:var(--bg3); border-radius:11px; transition:background .2s; }
+.switch-knob { position:absolute; left:2px; top:2px; width:18px; height:18px; background:#fff; border-radius:50%; transition:transform .2s; box-shadow:0 1px 3px rgba(0,0,0,0.3); }
+.switch input:checked + .switch-track { background:var(--accent); }
+.switch input:checked + .switch-track .switch-knob { transform:translateX(18px); }
+#scanOverlay { position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:1000; display:none; align-items:center; justify-content:center; }
+#scanModal { background:var(--card); border:1px solid var(--border); border-radius:16px; width:320px; max-width:90vw; box-shadow:0 8px 32px rgba(0,0,0,0.4); overflow:hidden; }
+.scan-item { display:flex; align-items:center; gap:10px; padding:10px 14px; margin:4px 6px; border-radius:10px; cursor:pointer; transition:background .15s; }
+.scan-item:hover { background:var(--bg3); }
+.scan-num { width:28px; height:28px; border-radius:8px; background:var(--bg3); display:flex; align-items:center; justify-content:center; font-size:14px; }
+.scan-name { font-size:14px; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.scan-id { font-size:11px; color:var(--fg3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .status-dot { width:8px; height:8px; border-radius:50%; background: var(--fg3); }
 .status-dot.on { background: var(--green); }
 .btn {
@@ -69,6 +94,10 @@ body {
 .btn-ghost { background: var(--bg3); color: var(--fg); }
 .main { display:flex; flex:1; overflow:hidden; }
 .col { padding:16px; overflow-y:auto; }
+.col::-webkit-scrollbar { width:8px; }
+.col::-webkit-scrollbar-track { background:transparent; }
+.col::-webkit-scrollbar-thumb { background:var(--bg3); border-radius:4px; }
+.col::-webkit-scrollbar-thumb:hover { background:var(--border); }
 .col-left { flex: 0 0 220px; border-right: 1px solid var(--border); background: var(--bg2); }
 .col-center { flex: 1; }
 .col-right { flex: 0 0 240px; border-left: 1px solid var(--border); background: var(--bg2); }
@@ -172,7 +201,7 @@ body {
   <h1>AiPi 加热台上位机</h1>
   <div style="display:flex;align-items:center;gap:10px;">
     <div class="status-pill"><span class="status-dot" id="dot"></span><span id="connText">未连接</span></div>
-    <select id="themeSel" style="border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;background:var(--card);color:var(--fg);font-family:inherit;cursor:pointer;">
+    <select id="themeSel" class="theme-sel">
       <option value="auto">🖥 跟随系统</option>
       <option value="light">☀ 浅色</option>
       <option value="dark">🌙 深色</option>
@@ -200,6 +229,13 @@ body {
         <div><strong>通知通道</strong><span>9013</span></div>
       </div>
     </div>
+    <div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+      <span style="font-size:13px;font-weight:500;flex:1;min-width:0;">信号监控图表</span>
+      <label class="switch" style="flex-shrink:0;margin-right:2px;">
+        <input type="checkbox" id="pwmChartToggle" checked>
+        <span class="switch-track"><span class="switch-knob"></span></span>
+      </label>
+    </div>
   </div>
   <div class="col col-center">
     <div class="mode-bar">
@@ -225,9 +261,9 @@ body {
         </div>
       </div>
       <div class="preset-grid" style="margin-top:12px;">
-        <div class="preset-btn" id="p1"><small>恒温 1</small><strong id="p1v">--</strong></div>
-        <div class="preset-btn" id="p2"><small>恒温 2</small><strong id="p2v">--</strong></div>
-        <div class="preset-btn" id="p3"><small>恒温 3</small><strong id="p3v">--</strong></div>
+        <div class="preset-btn" id="p1"><small>预设 1</small><strong id="p1v">--</strong></div>
+        <div class="preset-btn" id="p2"><small>预设 2</small><strong id="p2v">--</strong></div>
+        <div class="preset-btn" id="p3"><small>预设 3</small><strong id="p3v">--</strong></div>
       </div>
     </div>
     <div class="card" id="viewReflow" style="display:none;">
@@ -271,14 +307,12 @@ body {
       <div class="log-box" id="logBox"></div>
     </div>
     <div class="card" id="pwmCard" style="display:none;">
-      <div class="card-title">PWM 占空比 (5分钟)</div>
-      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:8px;height:clamp(140px,20vh,200px);">
-        <canvas id="pwmChart" width="600" height="150" style="width:100%;height:100%;display:block;"></canvas>
+      <div class="card-title">电气信号监控 (5分钟)</div>
+      <div class="const-chart" style="height:clamp(160px,24vh,240px);">
+        <canvas id="pwmChart" width="600" height="184"></canvas>
       </div>
-      <div style="display:flex;gap:16px;margin-top:8px;font-size:12px;">
-        <span><span style="color:#ff453a;">●</span> VPWM: <strong id="pwmLegendV">--%</strong></span>
-        <span><span style="color:#0a84ff;">●</span> IPWM: <strong id="pwmLegendI">--%</strong></span>
-      </div>
+      <div id="pwmLegend" style="display:flex;flex-wrap:wrap;gap:6px 24px;margin-top:10px;font-size:12px;"></div>
+      <div id="pwmSwitches" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;"></div>
     </div>
   </div>
   <div class="col col-right">
@@ -364,11 +398,14 @@ function calcRes(){
   $('res').textContent=(v/i).toFixed(2)+' Ω';
 }
 const stickyMap={};
+let lastDeviceId=null;
 
+const LOG_COLORS={error:'#ff453a',disconnect:'#ff453a',connect:'#30d158',notify:'#ff9f0a',write:'#0a84ff',info:'#98989d'};
+const CONN_STICKY='连接状态';
 function log(type, msg, stickyKey) {
   const box=$('logBox'); const t=new Date().toLocaleTimeString('zh-CN',{hour12:false});
-  const color=type==='error'?'var(--red)':type==='connect'?'var(--green)':type==='notify'?'var(--orange)':'var(--accent)';
-  const html=`<span style="color:var(--fg3)">${t}</span> <span style="color:${color}">${type.toUpperCase()}</span> ${msg}`;
+  const color=LOG_COLORS[type]||'var(--accent)';
+  const html=`<span style="color:var(--fg3)">${t}</span> <span style="color:${color}">${type.toUpperCase()}</span> <span style="color:${color}">${msg}</span>`;
   if(stickyKey){
     const existing=stickyMap[stickyKey];
     if(existing){existing.innerHTML=html;return;}
@@ -497,6 +534,26 @@ function updateModeUI(){
   $('viewConst').style.display=workMode===0?'':'none';
   $('viewReflow').style.display=workMode===1?'':'none';
 }
+// Device picker modal: click a device row to connect directly
+function pickDevice(devs){
+  return new Promise(resolve=>{
+    const ov=$('scanOverlay'),list=$('scanList'),sp=$('scanSpinner');
+    sp.textContent='发现 '+devs.length+' 个设备';
+    list.innerHTML='';
+    devs.forEach(d=>{
+      const item=document.createElement('div');
+      item.className='scan-item';
+      item.innerHTML='<span class="scan-num">🔗</span>'
+        +'<div style="flex:1;min-width:0;"><div class="scan-name">'+d.name+'</div>'
+        +'<div class="scan-id">'+d.id+'</div></div>'
+        +'<span style="font-size:11px;color:var(--fg3);">点击连接</span>';
+      item.onclick=()=>{ov.style.display='none';resolve(d);};
+      list.appendChild(item);
+    });
+    $('scanCancelBtn').onclick=()=>{ov.style.display='none';resolve(null);};
+    ov.style.display='flex';
+  });
+}
 
 // BLE connect / disconnect
 $('btnConn').addEventListener('click', async()=>{
@@ -508,21 +565,29 @@ $('btnConn').addEventListener('click', async()=>{
     $('infoDev').textContent='-';
     $('btnConn').textContent='连接设备'; $('btnConn').className='btn btn-primary';
     updateHeatBtn();
-    log('disconnect','已断开');
+    log('disconnect','已断开',CONN_STICKY);
     return;
   }
   log('info','正在扫描蓝牙设备...');
   try{
-    let devs=await invoke('ble_scan');
-    if(!devs||devs.length===0){devs=await invoke('ble_scan');}
+    // The heater needs 1~2s after disconnect to clear its cache and resume
+    // advertising, so retry the scan a few times before giving up.
+    let devs=[];
+    for(let i=0;i<3;i++){
+      devs=await invoke('ble_scan');
+      if(devs&&devs.length>0)break;
+      if(i<2)await new Promise(r=>setTimeout(r,1500));
+    }
     if(!devs||devs.length===0){log('info','未发现设备');return;}
     let chosen=devs[0];
     if(devs.length>1){
-      const list=devs.map((d,i)=>`${i+1}. ${d.name} (${d.id})`).join('\n');
-      const pick=prompt('发现多个设备，输入序号:\n'+list,'1');
-      if(!pick)return; chosen=devs[parseInt(pick)-1]; if(!chosen)return;
+      // Auto-pick the last connected device; only show the picker otherwise.
+      const last=devs.find(d=>d.id===lastDeviceId);
+      chosen=last||await pickDevice(devs);
+      if(!chosen)return;
     }
-    log('connect','连接 '+chosen.name+' ('+chosen.id+')');
+    lastDeviceId=chosen.id;
+    log('connect','连接 '+chosen.name+' ('+chosen.id+')',CONN_STICKY);
     listen('ble-notify',e=>onNotify(e.payload));
     listen('ble-disconnected',()=>{
       connected=false; heating=false;
@@ -530,7 +595,7 @@ $('btnConn').addEventListener('click', async()=>{
       $('connText').textContent='设备已断开';
       $('btnConn').textContent='连接设备'; $('btnConn').className='btn btn-primary';
       updateHeatBtn();
-      log('error','设备已断开连接');
+      log('error','设备已断开连接',CONN_STICKY);
     });
     let name=await invoke('ble_connect',{deviceId:chosen.id});
     connected=true;
@@ -538,9 +603,9 @@ $('btnConn').addEventListener('click', async()=>{
     $('connText').textContent='已连接: '+name;
     $('btnConn').textContent='断开连接'; $('btnConn').className='btn btn-danger';
     $('infoDev').textContent=name;
-    log('connect','BLE 已连接');
+    log('connect','BLE 已连接',CONN_STICKY);
     setTimeout(async()=>{try{await invoke('ble_write',{data:[0xF0,0x00]});}catch(e){}},100);
-  }catch(e){log('error','连接失败: '+e);}
+  }catch(e){log('error','连接失败: '+e,CONN_STICKY);}
 });
 
 // Heater toggle
@@ -606,7 +671,22 @@ document.querySelectorAll('.tab').forEach(tab=>{
 
 // Temperature chart (5 min rolling)
 const tempData=[], MAX_PTS=300;
+let pwmChartOn=true;
+function applyPwmChartOn(){
+  const card=$('pwmCard'); if(card)card.style.display=pwmChartOn?'':'none';
+}
 const pwmVData=[], pwmIData=[];
+const elecVData=[], elecIData=[], elecRData=[], elecPData=[];
+function elecSample(){
+  if(!ENABLE_PWM_DISPLAY)return;
+  const v=parseFloat($('vOut').textContent), i=parseFloat($('iOut').textContent),
+        r=parseFloat($('res').textContent), p=parseFloat($('pwr').textContent);
+  const now=Date.now();
+  elecVData.push({v:isNaN(v)?0:v,t:now}); if(elecVData.length>MAX_PTS)elecVData.shift();
+  elecIData.push({v:isNaN(i)?0:i,t:now}); if(elecIData.length>MAX_PTS)elecIData.shift();
+  elecRData.push({v:isNaN(r)?0:r,t:now}); if(elecRData.length>MAX_PTS)elecRData.shift();
+  elecPData.push({v:isNaN(p)?0:p,t:now}); if(elecPData.length>MAX_PTS)elecPData.shift();
+}
 function drawTempChart(){
   const c=$('tempChart'); if(!c)return;
   const rect=c.getBoundingClientRect();
@@ -659,6 +739,7 @@ setInterval(()=>{
   const v=parseFloat($('curTemp').textContent);
   if(!isNaN(v)){tempData.push({v,t:Date.now()}); if(tempData.length>MAX_PTS)tempData.shift();}
   if(ENABLE_PWM_DISPLAY){
+    elecSample();
     pwmVData.push({v:vpwmDuty,t:Date.now()}); if(pwmVData.length>MAX_PTS)pwmVData.shift();
     pwmIData.push({v:ipwmDuty,t:Date.now()}); if(pwmIData.length>MAX_PTS)pwmIData.shift();
     drawPwmChart();
@@ -722,27 +803,65 @@ $('btnRefreshCurve').addEventListener('click',()=>{drawReflowCurve();drawReflowP
   $(id)?.addEventListener('input',()=>{drawReflowCurve();drawReflowPhaseCards();});
 });
 drawReflowCurve(); drawReflowPhaseCards();
-if(ENABLE_PWM_DISPLAY){$('pwmCard').style.display='';}
+if(ENABLE_PWM_DISPLAY){applyPwmChartOn();$('pwmChartToggle').addEventListener('change',e=>{pwmChartOn=e.target.checked;applyPwmChartOn();if(pwmChartOn)drawPwmChart();});}
 
-// PWM chart
+// Electrical signals chart: signals with per-signal toggle + legend
+const PWM_SIGNALS=[
+  {id:'vpwm', name:'VPWM', unit:'%', color:'#ff453a', data:()=>pwmVData,  on:true, fmt:v=>Math.round(v)+'%'},
+  {id:'ipwm', name:'IPWM', unit:'%', color:'#0a84ff', data:()=>pwmIData,  on:true, fmt:v=>Math.round(v)+'%'},
+  {id:'vout', name:'电压', unit:'V', color:'#30d158', data:()=>elecVData, on:false, fmt:v=>v.toFixed(1)+'V'},
+  {id:'iout', name:'电流', unit:'A', color:'#ff9f0a', data:()=>elecIData, on:false, fmt:v=>v.toFixed(1)+'A'},
+  {id:'res',  name:'电阻', unit:'Ω', color:'#bf5af2', data:()=>elecRData, on:false, fmt:v=>v.toFixed(1)+'Ω'},
+  {id:'pwr',  name:'功率', unit:'W', color:'#64d2ff', data:()=>elecPData, on:false, fmt:v=>v.toFixed(1)+'W'},
+];
+function buildPwmLegend(){
+  const box=$('pwmLegend'); if(!box)return;
+  let html='';
+  PWM_SIGNALS.forEach(s=>{
+    const data=s.data(), last=data.length?data[data.length-1].v:0;
+    const val=(data.length&&last>0)?s.fmt(last):'--';
+    const op=s.on?'1':'0.35';
+    html+='<span style="display:inline-flex;align-items:center;white-space:nowrap;gap:4px;opacity:'+op+';">'
+         +'<span style="color:'+s.color+';">●</span> '+s.name+': <strong>'+val+'</strong></span>';
+  });
+  box.innerHTML=html;
+  const sw=$('pwmSwitches'); if(!sw)return;
+  sw.innerHTML='';
+  PWM_SIGNALS.forEach(s=>{
+    const b=document.createElement('button');
+    b.style.cssText='padding:3px 10px;font-size:11px;border:none;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:3px;margin-right:12px;';
+    b.innerHTML='<span style="color:'+(s.on?'#fff':s.color)+';">●</span>'+s.name;
+    if(s.on){b.style.background=s.color;b.style.color='#fff';}
+    else{b.style.background='var(--bg3)';b.style.color='var(--fg2)';}
+    b.onclick=()=>{s.on=!s.on;buildPwmLegend();drawPwmChart();};
+    sw.appendChild(b);
+  });
+}
 function drawPwmChart(){
   const c=$('pwmChart'); if(!c)return;
-  const rect=c.getBoundingClientRect();
-  const cw=Math.floor(rect.width), ch=Math.floor(rect.height);
-  if(cw<50||ch<50)return;
+  // Height is CSS-locked (184px) so bitmap changes cannot affect layout:
+  // no feedback loop. Width measured from layout to fill the card exactly.
+  const cw=Math.floor(c.offsetWidth)||600, ch=184;
   c.width=cw; c.height=ch;
   const ctx=c.getContext('2d'), W=c.width, H=c.height;
-  const L=35, R=10, T=10, B=24;
+  const L=42, R=10, T=10, B=24;
   const pw=W-L-R, ph=H-T-B;
   ctx.clearRect(0,0,W,H);
-  if(pwmVData.length<2&&pwmIData.length<2){ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--fg3').trim();ctx.font='12px sans-serif';ctx.fillText('等待数据...',W/2-30,H/2);return;}
-  // Y axis 0~100%
-  const mn=0, mx=100, rng=mx-mn||1;
-  ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--fg2').trim()||'#86868b';
-  ctx.font='10px sans-serif'; ctx.textAlign='right'; ctx.textBaseline='middle';
-  for(let v=0;v<=100;v+=25){
+  const act=PWM_SIGNALS.filter(s=>s.on&&s.data().length>=2);
+  if(!act.length){ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--fg3').trim();ctx.font='12px sans-serif';ctx.textAlign='center';ctx.fillText('等待数据...（点击图例开启信号）',W/2,H/2);return;}
+  // Y axis: auto-scale over active signals, nice rounded bounds
+  let mn=Infinity,mx=-Infinity;
+  act.forEach(s=>s.data().forEach(p=>{if(p.v<mn)mn=p.v;if(p.v>mx)mx=p.v;}));
+  if(!isFinite(mn)){mn=0;mx=100;}
+  if(mx===mn)mx=mn+1;
+  const span=mx-mn, step=Math.pow(10,Math.floor(Math.log10(span/4)));
+  mn=Math.floor(mn/step)*step; mx=Math.ceil(mx/step)*step;
+  const rng=mx-mn||1;
+  const fg2=getComputedStyle(document.documentElement).getPropertyValue('--fg2').trim()||'#86868b';
+  ctx.fillStyle=fg2; ctx.font='10px sans-serif'; ctx.textAlign='right'; ctx.textBaseline='middle';
+  for(let v=mn;v<=mx+1e-9;v+=step){
     const y=T+ph-(v-mn)/rng*ph;
-    ctx.fillText(v+'%',L-4,y);
+    ctx.fillText(rng>=50?Math.round(v):v.toFixed(1),L-4,y);
     ctx.strokeStyle='rgba(128,128,128,0.12)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(L,y);ctx.lineTo(W-R,y);ctx.stroke();
   }
   // X axis relative time
@@ -752,23 +871,18 @@ function drawPwmChart(){
     const label=secAgo===0?'现在':(secAgo>=60?(secAgo/60)+'min':secAgo+'s');
     ctx.fillText(label,x,H-B+4);
   }
-  // draw curve
-  function drawLine(data,color){
-    if(data.length<2)return;
-    ctx.strokeStyle=color; ctx.lineWidth=1.5; ctx.beginPath();
-    const now=Date.now();
+  // draw curves (spread across full width regardless of point count)
+  act.forEach(s=>{
+    const data=s.data();
+    ctx.strokeStyle=s.color; ctx.lineWidth=1.5; ctx.beginPath();
     data.forEach((p,i)=>{
-      const x=L+((300-((now-p.t)/1000))/300)*pw;
+      const x=L+(i/(data.length-1))*pw;
       const y=T+ph-(p.v-mn)/rng*ph;
       i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
     });
     ctx.stroke();
-  }
-  drawLine(pwmVData,'#ff453a');
-  drawLine(pwmIData,'#0a84ff');
-  // update legend
-  if($('pwmLegendV'))$('pwmLegendV').textContent=vpwmDuty+'%';
-  if($('pwmLegendI'))$('pwmLegendI').textContent=ipwmDuty+'%';
+  });
+  buildPwmLegend();
 }
 
 // Clear log
@@ -777,5 +891,19 @@ $('btnClearLog').addEventListener('click',()=>{$('logBox').innerHTML='';for(cons
 log('info','AiPi 加热台上位机就绪');
 updateModeUI();
 </script>
+
+<div id="scanOverlay">
+  <div id="scanModal">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+      <span style="font-size:15px;font-weight:600;">选择蓝牙设备</span>
+      <span id="scanSpinner" style="font-size:12px;color:var(--fg2);"></span>
+    </div>
+    <div id="scanList" style="max-height:300px;overflow-y:auto;padding:4px 0;"></div>
+    <div style="padding:10px 14px;border-top:1px solid var(--border);text-align:right;">
+      <button class="btn btn-ghost" id="scanCancelBtn">取消</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

@@ -18,11 +18,14 @@ struct BleState {
     adapter: Option<Adapter>,
     peripheral: Option<Peripheral>,
     connected: bool,
+    // (address, name) of the last successfully connected device, so a scan
+    // right after disconnect can still surface it before it re-advertises.
+    last_device: Option<(String, String)>,
 }
 
 impl Default for BleState {
     fn default() -> Self {
-        Self { adapter: None, peripheral: None, connected: false }
+        Self { adapter: None, peripheral: None, connected: false, last_device: None }
     }
 }
 
@@ -37,24 +40,84 @@ async fn get_adapter() -> Result<Adapter, String> {
     adapters.into_iter().next().ok_or_else(|| "No BLE adapter found".into())
 }
 
+fn is_heater_name(n: &str) -> bool {
+    let n = n.trim();
+    !n.is_empty()
+        && n.ne("Unknown")
+        && (n.contains("AiPi") || n.contains("AIPI") || n.contains("aipi")
+            || n.contains("加热台") || n.contains("Heat") || n.contains("heat")
+            || n.contains("Thermo") || n.contains("thermo"))
+}
+
 #[tauri::command]
 async fn ble_scan(state: tauri::State<'_, SharedBle>) -> Result<Vec<BleDevice>, String> {
-    let adapter = get_adapter().await?;
+    // Reuse the adapter from a previous scan when possible: building a fresh
+    // Manager on Windows loses the peripheral cache, so devices seen before a
+    // disconnect vanish from the next scan and reconnect appears to find nothing.
+    let adapter = {
+        let s = state.lock().await;
+        match s.adapter.as_ref() {
+            Some(a) => a.clone(),
+            None => get_adapter().await?,
+        }
+    };
     adapter.start_scan(ScanFilter::default()).await.map_err(|e| format!("start_scan: {e}"))?;
-    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-    let peripherals = adapter.peripherals().await.map_err(|e| format!("peripherals: {e}"))?;
-    let mut devices = Vec::new();
-    for p in &peripherals {
-        if let Ok(props) = p.properties().await {
-            let name = props.and_then(|pr| pr.local_name).unwrap_or_else(|| "Unknown".into());
-            let id = p.address().to_string();
-            devices.push(BleDevice { name, id });
+
+    // Poll up to 5s instead of a fixed 1s wait: BLE devices advertise every
+    // 1~2s, so a 1s window often misses them entirely. Return early as soon
+    // as a heater device shows up.
+    let mut named: Vec<BleDevice> = Vec::new();
+    for _ in 0..10 {
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        let peripherals = adapter.peripherals().await.map_err(|e| format!("peripherals: {e}"))?;
+        named.clear();
+        let mut heaters: Vec<BleDevice> = Vec::new();
+        for p in &peripherals {
+            if let Ok(props) = p.properties().await {
+                let name = props.and_then(|pr| pr.local_name).unwrap_or_else(|| "Unknown".into());
+                // Filter: drop empty/unknown names (BLE scan spam). Prefer
+                // heater devices; if none advertised yet, fall back to all
+                // named devices so the picker still shows something (the
+                // web Bluetooth picker behaves the same way).
+                let n = name.trim();
+                if n.is_empty() || n == "Unknown" { continue; }
+                let id = p.address().to_string();
+                if is_heater_name(n) {
+                    heaters.push(BleDevice { name: name.clone(), id });
+                } else {
+                    named.push(BleDevice { name, id });
+                }
+            }
+        }
+        if !heaters.is_empty() {
+            adapter.stop_scan().await.ok();
+            let mut s = state.lock().await;
+            s.adapter = Some(adapter);
+            return Ok(heaters);
+        }
+        // Fallback: if the previously-connected device is still in the
+        // adapter's peripheral cache (Windows keeps it a while after
+        // disconnect), surface it even before it re-advertises.
+        let recalled = {
+            let s = state.lock().await;
+            s.last_device.clone()
+        };
+        if let Some((last_id, last_name)) = recalled {
+            if heaters.iter().chain(named.iter()).all(|d| d.id != last_id)
+                && peripherals.iter().any(|p| p.address().to_string() == last_id)
+            {
+                heaters.push(BleDevice { name: last_name, id: last_id });
+                adapter.stop_scan().await.ok();
+                let mut s = state.lock().await;
+                s.adapter = Some(adapter);
+                return Ok(heaters);
+            }
         }
     }
     adapter.stop_scan().await.map_err(|e| format!("stop_scan: {e}"))?;
     let mut s = state.lock().await;
     s.adapter = Some(adapter);
-    Ok(devices)
+    Ok(named)
 }
 
 #[tauri::command]
@@ -66,24 +129,43 @@ async fn ble_connect(
     let mut s = state.lock().await;
     let adapter = s.adapter.as_ref().ok_or("No adapter, call ble_scan first")?;
     let peripherals = adapter.peripherals().await.map_err(|e| format!("peripherals: {e}"))?;
-    let target = peripherals.into_iter().find(|p| p.address().to_string() == device_id)
-        .ok_or_else(|| format!("Device {device_id} not found"))?;
+    let target = peripherals.into_iter().find(|p| p.address().to_string() == device_id);
+    let target = match target {
+        Some(p) => p,
+        None => {
+            // Device may have started advertising after the scan ended.
+            // Do one quick re-scan before giving up.
+            adapter.start_scan(ScanFilter::default()).await.map_err(|e| format!("start_scan: {e}"))?;
+            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            adapter.stop_scan().await.ok();
+            let peripherals = adapter.peripherals().await.map_err(|e| format!("peripherals: {e}"))?;
+            peripherals.into_iter().find(|p| p.address().to_string() == device_id)
+                .ok_or_else(|| format!("Device {device_id} not found"))?
+        }
+    };
 
-    // Windows btleplug often fails first connect attempt; retry up to 3 times
+    // Windows btleplug often fails first connect attempt; retry up to 5 times.
+    // If the OS-level link is already up (e.g. quick reconnect after
+    // disconnect), skip the handshake entirely — calling connect() again on
+    // an already-connected peripheral can error out on Windows.
     let mut connected = false;
-    for attempt in 1..=3 {
+    for attempt in 1..=5 {
+        if target.is_connected().await.unwrap_or(false) {
+            connected = true;
+            break;
+        }
         match target.connect().await {
             Ok(_) => { connected = true; break; }
             Err(e) => {
                 eprintln!("[BLE] connect attempt {attempt} failed: {e}");
-                if attempt < 3 {
-                    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                if attempt < 5 {
+                    tokio::time::sleep(std::time::Duration::from_millis(400)).await;
                 }
             }
         }
     }
     if !connected {
-        return Err("Failed to connect after 3 attempts. Make sure the device is advertising and not already connected.".into());
+        return Err("Failed to connect after 5 attempts. Make sure the device is advertising and not already connected.".into());
     }
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     target.discover_services().await.map_err(|e| format!("discover: {e}"))?;
@@ -152,6 +234,7 @@ async fn ble_connect(
 
     let name = target.properties().await.ok().flatten()
         .and_then(|p| p.local_name).unwrap_or_else(|| "Connected".into());
+    s.last_device = Some((device_id.clone(), name.clone()));
     s.peripheral = Some(target);
     s.connected = true;
     Ok(name)
