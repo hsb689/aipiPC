@@ -198,7 +198,7 @@ body {
 </head>
 <body>
 <div class="header">
-  <h1>AiPi 加热台上位机 <span style="font-size:0.55em;font-weight:600;color:var(--fg2);vertical-align:middle;">V0.01</span></h1>
+  <h1>AiPi 加热台上位机 <span style="font-size:0.55em;font-weight:600;color:var(--fg2);vertical-align:middle;">V0.02</span></h1>
   <div style="display:flex;align-items:center;gap:10px;">
     <div class="status-pill"><span class="status-dot" id="dot"></span><span id="connText">未连接</span></div>
     <select id="themeSel" class="theme-sel">
@@ -671,9 +671,11 @@ document.querySelectorAll('.tab').forEach(tab=>{
 
 // Temperature chart (5 min rolling)
 const tempData=[], MAX_PTS=300;
-let pwmChartOn=true;
+// Persist the chart visibility toggle across launches
+let pwmChartOn=localStorage.getItem('pwmChartOn')!=='0';
 function applyPwmChartOn(){
   const card=$('pwmCard'); if(card)card.style.display=pwmChartOn?'':'none';
+  const tgl=$('pwmChartToggle'); if(tgl)tgl.checked=pwmChartOn;
 }
 const pwmVData=[], pwmIData=[];
 const elecVData=[], elecIData=[], elecRData=[], elecPData=[];
@@ -803,7 +805,14 @@ $('btnRefreshCurve').addEventListener('click',()=>{drawReflowCurve();drawReflowP
   $(id)?.addEventListener('input',()=>{drawReflowCurve();drawReflowPhaseCards();});
 });
 drawReflowCurve(); drawReflowPhaseCards();
-if(ENABLE_PWM_DISPLAY){applyPwmChartOn();$('pwmChartToggle').addEventListener('change',e=>{pwmChartOn=e.target.checked;applyPwmChartOn();if(pwmChartOn)drawPwmChart();});}
+if(ENABLE_PWM_DISPLAY){
+  applyPwmChartOn();
+  $('pwmChartToggle').addEventListener('change',e=>{
+    pwmChartOn=e.target.checked;
+    localStorage.setItem('pwmChartOn',pwmChartOn?'1':'0');
+    applyPwmChartOn();if(pwmChartOn)drawPwmChart();
+  });
+}
 
 // Electrical signals chart: signals with per-signal toggle + legend
 const PWM_SIGNALS=[
@@ -833,10 +842,20 @@ function buildPwmLegend(){
     b.innerHTML='<span style="color:'+(s.on?'#fff':s.color)+';">●</span>'+s.name;
     if(s.on){b.style.background=s.color;b.style.color='#fff';}
     else{b.style.background='var(--bg3)';b.style.color='var(--fg2)';}
-    b.onclick=()=>{s.on=!s.on;buildPwmLegend();drawPwmChart();};
+    b.onclick=()=>{s.on=!s.on;savePwmSignalStates();buildPwmLegend();drawPwmChart();};
     sw.appendChild(b);
   });
 }
+// Persist per-signal visibility across launches
+function savePwmSignalStates(){
+  try{ localStorage.setItem('pwmSignalOn', JSON.stringify(PWM_SIGNALS.map(s=>s.on))); }catch(e){}
+}
+(function restorePwmSignalStates(){
+  try{
+    const saved=JSON.parse(localStorage.getItem('pwmSignalOn')||'null');
+    if(Array.isArray(saved)) PWM_SIGNALS.forEach((s,i)=>{ if(typeof saved[i]==='boolean') s.on=saved[i]; });
+  }catch(e){}
+})();
 function drawPwmChart(){
   const c=$('pwmChart'); if(!c)return;
   // Height is CSS-locked (184px) so bitmap changes cannot affect layout:
