@@ -4,7 +4,7 @@
 
 **基于 Tauri 2 的 BLE 加热台桌面控制中心**
 
-[![Version](https://img.shields.io/badge/版本-V0.02-30d158?style=flat-square)](https://github.com/hsb689/aipiPC/releases)
+[![Version](https://img.shields.io/badge/版本-V0.1-30d158?style=flat-square)](https://github.com/hsb689/aipiPC/releases)
 [![Platform](https://img.shields.io/badge/平台-Windows%20x64-0a84ff?style=flat-square)](https://github.com/hsb689/aipiPC/releases)
 [![Framework](https://img.shields.io/badge/框架-Tauri%202-ff9f0a?style=flat-square)](https://v2.tauri.app)
 [![BLE](https://img.shields.io/badge/通信-BLE%20%7C%20btleplug-8ab4ff?style=flat-square)](#ble-协议)
@@ -86,7 +86,7 @@ npx tauri build          # 或使用 build-tauri.ps1(Windows)
 
 ## 📥 下载
 
-前往 [**Releases**](https://github.com/hsb689/aipiPC/releases) 下载最新版 `AiPi-Heater-Upper-V0.02.exe`,免安装、单文件运行。
+前往 [**Releases**](https://github.com/hsb689/aipiPC/releases) 下载最新版 `AiPi-Heater-Upper-V0.1.exe`,免安装、单文件运行。
 
 ## License
 

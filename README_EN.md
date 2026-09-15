@@ -4,7 +4,7 @@
 
 **A BLE desktop control center for the AiPi heater platform, built with Tauri 2**
 
-[![Version](https://img.shields.io/badge/Version-V0.02-30d158?style=flat-square)](https://github.com/hsb689/aipiPC/releases)
+[![Version](https://img.shields.io/badge/Version-V0.1-30d158?style=flat-square)](https://github.com/hsb689/aipiPC/releases)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20x64-0a84ff?style=flat-square)](https://github.com/hsb689/aipiPC/releases)
 [![Framework](https://img.shields.io/badge/Framework-Tauri%202-ff9f0a?style=flat-square)](https://v2.tauri.app)
 [![BLE](https://img.shields.io/badge/Comm-BLE%20%7C%20btleplug-8ab4ff?style=flat-square)](#ble-protocol)
@@ -86,7 +86,7 @@ The output is located at `target/release/aipi-heater-upper.exe`.
 
 ## 📥 Download
 
-Grab the latest `AiPi-Heater-Upper-V0.02.exe` from [**Releases**](https://github.com/hsb689/aipiPC/releases) — portable, single file, no installation required.
+Grab the latest `AiPi-Heater-Upper-V0.1.exe` from [**Releases**](https://github.com/hsb689/aipiPC/releases) — portable, single file, no installation required.
 
 ## License
 
