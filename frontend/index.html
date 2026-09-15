@@ -400,12 +400,12 @@ function calcRes(){
 const stickyMap={};
 let lastDeviceId=null;
 
-const LOG_COLORS={error:'#ff453a',disconnect:'#ff453a',connect:'#30d158',notify:'#ff9f0a',write:'#0a84ff',info:'#98989d'};
+const LOG_COLORS={error:'#ff453a',disconnect:'#ff453a',connect:'#30d158',notify:'#ff9f0a',write:'#0a84ff',info:'#bf5af2'};
 const CONN_STICKY='连接状态';
 function log(type, msg, stickyKey) {
   const box=$('logBox'); const t=new Date().toLocaleTimeString('zh-CN',{hour12:false});
   const color=LOG_COLORS[type]||'var(--accent)';
-  const html=`<span style="color:var(--fg3)">${t}</span> <span style="color:${color}">${type.toUpperCase()}</span> <span style="color:${color}">${msg}</span>`;
+  const html=`<span style="color:${color};opacity:0.55">${t}</span> <span style="color:${color}">${type.toUpperCase()}</span> <span style="color:${color}">${msg}</span>`;
   if(stickyKey){
     const existing=stickyMap[stickyKey];
     if(existing){existing.innerHTML=html;return;}
