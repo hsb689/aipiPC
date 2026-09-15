@@ -194,6 +194,13 @@ body {
 .conn-info div:last-child { border-bottom:none; }
 .conn-info strong { color: var(--fg2); font-weight:400; }
 .conn-info span { font-weight:500; }
+.log-lc { opacity: 0.55; }
+.log-error { color: #ff453a !important; }
+.log-disconnect { color: #ff453a !important; }
+.log-connect { color: #30d158 !important; }
+.log-notify { color: #ff9f0a !important; }
+.log-write { color: #0a84ff !important; }
+.log-info { color: #bf5af2 !important; }
 </style>
 </head>
 <body>
@@ -398,6 +405,10 @@ function calcRes(){
   $('res').textContent=(v/i).toFixed(2)+' Ω';
 }
 const stickyMap={};
+// Surface any runtime JS error in the comm log so renderer issues are visible
+window.addEventListener('error', e => {
+  try { log('error', 'JS错误: ' + (e.message || e.type)); } catch (_) {}
+});
 let lastDeviceId=null;
 
 const LOG_COLORS={error:'#ff453a',disconnect:'#ff453a',connect:'#30d158',notify:'#ff9f0a',write:'#0a84ff',info:'#bf5af2'};
@@ -405,7 +416,7 @@ const CONN_STICKY='连接状态';
 function log(type, msg, stickyKey) {
   const box=$('logBox'); const t=new Date().toLocaleTimeString('zh-CN',{hour12:false});
   const color=LOG_COLORS[type]||'var(--accent)';
-  const html=`<span style="color:${color};opacity:0.55">${t}</span> <span style="color:${color}">${type.toUpperCase()}</span> <span style="color:${color}">${msg}</span>`;
+  const html=`<span class="log-lc log-${type}">${t}</span> <span class="log-${type}">${type.toUpperCase()}</span> <span class="log-${type}">${msg}</span>`;
   if(stickyKey){
     const existing=stickyMap[stickyKey];
     if(existing){existing.innerHTML=html;return;}
@@ -845,7 +856,7 @@ function buildPwmLegend(){
     b.innerHTML='<span style="color:'+(s.on?'#fff':s.color)+';">●</span>'+s.name;
     if(s.on){b.style.background=s.color;b.style.color='#fff';}
     else{b.style.background='var(--bg3)';b.style.color='var(--fg2)';}
-    b.onclick=()=>{s.on=!s.on;savePwmSignalStates();buildPwmLegend();drawPwmChart();};
+    b.onclick=()=>{s.on=!s.on;savePwmSignalStates();try{buildPwmLegend()}catch(e){console.error('legend:',e)};drawPwmChart();};
     sw.appendChild(b);
   });
 }
@@ -904,7 +915,7 @@ function drawPwmChart(){
     });
     ctx.stroke();
   });
-  buildPwmLegend();
+  try{buildPwmLegend()}catch(e){console.error('legend:',e)};
 }
 
 // Clear log
