@@ -31,7 +31,7 @@ AiPi Heater Platform Host is a desktop application built with **Tauri 2** (Rust 
 | 📈 | **Reflow Mode** | Multi-segment reflow temperature curve configuration and provisioning |
 | ⚙️ | **Parameter Config** | Constant-temp / reflow / heater parameters, grouped in tabbed panels |
 | ⚡ | **Electrical Monitoring** | Real-time VPWM / IPWM duty sampling with a 5-minute rolling chart |
-| 📋 | **Comm Log** | Color-coded by level (🔴 error 🟢 connect 🟠 data 🔵 write 🟣 info); high-frequency data logs and connection status use fixed sticky slots — no scrolling spam |
+| 📋 | **Comm Log** | Color-coded by level (🔴 error 🟢 connect 🌿 info 🟠 data 🔵 write); high-frequency data logs and connection status use fixed sticky slots — no scrolling spam |
 | 🎨 | **Themes** | Follow system / light / dark |
 
 ## 🧰 Tech Stack

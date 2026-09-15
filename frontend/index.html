@@ -200,7 +200,7 @@ body {
 .log-connect { color: #30d158 !important; }
 .log-notify { color: #ff9f0a !important; }
 .log-write { color: #0a84ff !important; }
-.log-info { color: #bf5af2 !important; }
+.log-info { color: #8fd694 !important; }
 </style>
 </head>
 <body>
@@ -411,7 +411,7 @@ window.addEventListener('error', e => {
 });
 let lastDeviceId=null;
 
-const LOG_COLORS={error:'#ff453a',disconnect:'#ff453a',connect:'#30d158',notify:'#ff9f0a',write:'#0a84ff',info:'#bf5af2'};
+const LOG_COLORS={error:'#ff453a',disconnect:'#ff453a',connect:'#30d158',notify:'#ff9f0a',write:'#0a84ff',info:'#8fd694'};
 const CONN_STICKY='连接状态';
 function log(type, msg, stickyKey) {
   const box=$('logBox'); const t=new Date().toLocaleTimeString('zh-CN',{hour12:false});
@@ -856,20 +856,14 @@ function buildPwmLegend(){
     b.innerHTML='<span style="color:'+(s.on?'#fff':s.color)+';">●</span>'+s.name;
     if(s.on){b.style.background=s.color;b.style.color='#fff';}
     else{b.style.background='var(--bg3)';b.style.color='var(--fg2)';}
-    b.onclick=()=>{s.on=!s.on;savePwmSignalStates();try{buildPwmLegend()}catch(e){console.error('legend:',e)};drawPwmChart();};
+    b.onclick=()=>{s.on=!s.on;try{buildPwmLegend()}catch(e){console.error('legend:',e)};drawPwmChart();};
     sw.appendChild(b);
   });
 }
-// Persist per-signal visibility across launches
-function savePwmSignalStates(){
-  try{ localStorage.setItem('pwmSignalOn', JSON.stringify(PWM_SIGNALS.map(s=>s.on))); }catch(e){}
-}
-(function restorePwmSignalStates(){
-  try{
-    const saved=JSON.parse(localStorage.getItem('pwmSignalOn')||'null');
-    if(Array.isArray(saved)) PWM_SIGNALS.forEach((s,i)=>{ if(typeof saved[i]==='boolean') s.on=saved[i]; });
-  }catch(e){}
-})();
+// Per-signal switches are NOT persisted: every launch resets to defaults
+// (VPWM+IPWM on), per user preference. Only the chart visibility toggle is
+// persisted. Clear any stale key from older versions.
+try{ localStorage.removeItem('pwmSignalOn'); }catch(e){}
 function drawPwmChart(){
   const c=$('pwmChart'); if(!c)return;
   // Height is CSS-locked (184px) so bitmap changes cannot affect layout:
