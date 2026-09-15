@@ -674,7 +674,10 @@ const tempData=[], MAX_PTS=300;
 // Persist the chart visibility toggle across launches
 let pwmChartOn=localStorage.getItem('pwmChartOn')!=='0';
 function applyPwmChartOn(){
-  const card=$('pwmCard'); if(card)card.style.display=pwmChartOn?'':'none';
+  // Hide only the chart + legend; keep the signal switch row always visible
+  // so signals can be re-enabled after everything was turned off.
+  const chart=$('pwmChart'); if(chart)chart.style.display=pwmChartOn?'':'none';
+  const leg=$('pwmLegend'); if(leg)leg.style.display=pwmChartOn?'':'none';
   const tgl=$('pwmChartToggle'); if(tgl)tgl.checked=pwmChartOn;
 }
 const pwmVData=[], pwmIData=[];
