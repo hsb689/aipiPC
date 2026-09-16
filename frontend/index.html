@@ -306,9 +306,9 @@ body {
         <button class="btn btn-ghost" id="btnRefreshCurve">刷新曲线</button>
       </div>
     </div>
-    <div class="card">
+    <div class="card" id="logCard"">
       <div class="row-between">
-        <div class="card-title" style="margin:0;">通信日志</div>
+        <div class="card-title" style="margin:0;">通信日志</div><label class="switch" style="flex-shrink:0;margin-left:10px;"><input type="checkbox" id="logCardToggle" checked></label>
         <button class="btn btn-ghost" id="btnClearLog" style="padding:3px 8px;font-size:11px;">清空</button>
       </div>
       <div class="log-box" id="logBox"></div>
@@ -684,6 +684,19 @@ document.querySelectorAll('.tab').forEach(tab=>{
 const tempData=[], MAX_PTS=300;
 // Persist the chart visibility toggle across launches
 let pwmChartOn=localStorage.getItem('pwmChartOn')!=='0';
+
+// Comm-log card visibility: default on, remembered across launches
+let logCardOn=localStorage.getItem('logCardOn')!=='0';
+function applyLogCardOn(){
+  const card=$('logCard'); if(card)card.style.display=logCardOn?'':'none';
+  const tgl=$('logCardToggle'); if(tgl)tgl.checked=logCardOn;
+}
+applyLogCardOn();
+$('logCardToggle').addEventListener('change',e=>{
+  logCardOn=e.target.checked;
+  localStorage.setItem('logCardOn',logCardOn?'1':'0');
+  applyLogCardOn();
+});
 function applyPwmChartOn(){
   // Hide/show the whole card. The master toggle lives OUTSIDE pwmCard
   // (verified by DOM position), so it stays reachable when the card is hidden.
