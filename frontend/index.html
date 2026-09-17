@@ -390,6 +390,23 @@ $('themeSel').addEventListener('change',e=>applyTheme(e.target.value));
 const invoke = window.__TAURI__.core.invoke;
 const listen = window.__TAURI__.event.listen;
 
+
+// ---- Check for updates (GitHub Releases) ----
+const APP_VERSION='V0.1';
+const UPDATE_URL='https://github.com/hsb689/aipiPC/releases/latest';
+async function checkForUpdate(){
+  try{
+    const r=await fetch('https://api.github.com/repos/hsb689/aipiPC/releases/latest',{cache:'no-store'});
+    if(!r.ok) return;
+    const j=await r.json();
+    const tag=(j.tag_name||'').replace(/^v/i,'V');
+    if(tag && tag!=='V0.1'){
+      log('info','发现新版本 '+tag+'(当前 '+APP_VERSION+'),下载: '+UPDATE_URL);
+    }
+  }catch(e){ /* offline or blocked: silently ignore */ }
+}
+setTimeout(checkForUpdate, 2500);
+
 const CMD={SET_WORK_MODE:0x00,SET_TARGET_TEMP:0x01,SET_PRESET1:0x02,SET_PRESET2:0x03,SET_PRESET3:0x04,
   SET_TCOMP:0x05,SET_ASHUT:0x06,SET_HEATER:0x07,RF_PREHEAT_T:0x10,RF_KEEP_T:0x11,RF_REFLOW_T:0x12,
   RF_PREHEAT_TM:0x13,RF_KEEP_TM:0x14,RF_REFLOW_TM:0x15,PID_KP:0x20,PID_KI:0x21,PID_KD:0x22,
