@@ -202,11 +202,12 @@ body {
 .log-write { color: #0a84ff !important; }
 .log-info { color: #8fd694 !important; }
 .tgl-row{display:flex!important;align-items:center;justify-content:space-between!important;gap:12px;width:100%;box-sizing:border-box;}
+#updBadge{display:inline-block!important;font-size:15px!important;font-weight:600!important;padding:4px 14px!important;border-radius:14px!important;vertical-align:middle!important;background:#e8e8ed!important;color:#6e6e73!important;border:1px solid #d1d1d6!important;}
 </style>
 </head>
 <body>
 <div class="header">
-  <h1>AiPi 加热台上位机 <span style="font-size:0.55em;font-weight:600;color:var(--fg2);vertical-align:middle;">V0.1</span><span id="updBadge" style="display:none;font-size:0.5em;font-weight:600;padding:2px 8px;border-radius:10px;vertical-align:middle;margin-left:8px;"></span></h1>
+  <span id="updBadge">V0.2</span>
   <div style="display:flex;align-items:center;gap:10px;">
     <div class="status-pill"><span class="status-dot" id="dot"></span><span id="connText">未连接</span></div>
     <select id="themeSel" class="theme-sel">
@@ -237,12 +238,12 @@ body {
         <div><strong>通知通道</strong><span>9013</span></div>
       </div>
     </div>
-    <div class="card tgl-row"><span style="font-size:13px;font-weight:500;">信号监控图表</span><label class="switch" style="flex-shrink:0;margin-right:2px;">
-        <input type="checkbox" id="pwmChartToggle" checked>
-        <span class="switch-track"><span class="switch-knob"></span></span>
-      </label></div>
     <div class="card tgl-row"><span style="font-size:13px;font-weight:500;">通信日志</span><label class="switch" style="flex-shrink:0;margin-right:2px;">
         <input type="checkbox" id="logCardToggle" checked>
+        <span class="switch-track"><span class="switch-knob"></span></span>
+      </label></div>
+    <div class="card tgl-row"><span style="font-size:13px;font-weight:500;">信号监控图表</span><label class="switch" style="flex-shrink:0;margin-right:2px;">
+        <input type="checkbox" id="pwmChartToggle" checked>
         <span class="switch-track"><span class="switch-knob"></span></span>
       </label></div>
   </div>
@@ -392,21 +393,21 @@ const listen = window.__TAURI__.event.listen;
 
 
 // ---- Check for updates (GitHub Releases) ----
-const APP_VERSION='V0.1';
+const APP_VERSION='V0.2';
 const UPDATE_URL='https://github.com/hsb689/aipiPC/releases/latest';
-function setUpdBadge(state){ // 'ok' | 'new'
+function setUpdBadge(state){
   const el=document.getElementById('updBadge'); if(!el) return;
   if(state==='new'){
-    el.textContent='有更新';
-    el.style.background='rgba(255,69,58,.18)';
-    el.style.color='#ff453a';
+    el.style.background='#ffd9d6';
+    el.style.color='#c9302c';
+    el.style.border='1px solid #ffb3ae';
     el.style.cursor='pointer';
-    el.title='点击打开最新版发布页';
+    el.title='有新版本，点击前往 GitHub 下载';
     el.onclick=()=>{ try{ window.__TAURI__.shell.open(UPDATE_URL); }catch(e){ window.open(UPDATE_URL,'_blank'); } };
   }else{
-    el.textContent='已是最新';
-    el.style.background='rgba(48,209,88,.15)';
-    el.style.color='#30d158';
+    el.style.background='#e8e8ed';
+    el.style.color='#6e6e73';
+    el.style.border='1px solid #d1d1d6';
     el.style.cursor='default';
     el.title='';
     el.onclick=null;

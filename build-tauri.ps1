@@ -30,3 +30,19 @@ if ($exe) {
 } else {
     Write-Host '[WARN] exe not found in target/release' -ForegroundColor Yellow
 }
+
+# Package portable zip: exe + WebView2Loader.dll must stay together
+$dll = Join-Path $PSScriptRoot 'target/release/WebView2Loader.dll'
+if (Test-Path $exe.FullName) {
+  if (-not (Test-Path $dll)) { Write-Host '[WARN] WebView2Loader.dll not found next to exe' -ForegroundColor Yellow }
+  $zip = Join-Path $PSScriptRoot 'target/release/AiPi-Heater-Upper-V0.2-win64.zip'
+  if (Test-Path $zip) { Remove-Item $zip -Force }
+  $stage = Join-Path $env:TEMP 'aipi_pkg'
+  if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
+  New-Item -ItemType Directory -Path $stage | Out-Null
+  Copy-Item $exe.FullName (Join-Path $stage 'AiPi-Heater-Upper-V0.2.exe')
+  if (Test-Path $dll) { Copy-Item $dll $stage }
+  Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip
+  Remove-Item $stage -Recurse -Force
+  Write-Host "[OK] Portable zip: $zip" -ForegroundColor Green
+}
