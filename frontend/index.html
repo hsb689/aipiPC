@@ -201,6 +201,7 @@ body {
 .log-notify { color: #ff9f0a !important; }
 .log-write { color: #0a84ff !important; }
 .log-info { color: #8fd694 !important; }
+.tgl-row{display:flex!important;align-items:center;justify-content:space-between!important;gap:12px;width:100%;box-sizing:border-box;}
 </style>
 </head>
 <body>
@@ -236,11 +237,11 @@ body {
         <div><strong>通知通道</strong><span>9013</span></div>
       </div>
     </div>
-    <div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;box-sizing:border-box;"><span style="font-size:13px;font-weight:500;">信号监控图表</span><label class="switch" style="flex-shrink:0;margin-right:2px;">
+    <div class="card tgl-row"><span style="font-size:13px;font-weight:500;">信号监控图表</span><label class="switch" style="flex-shrink:0;margin-right:2px;">
         <input type="checkbox" id="pwmChartToggle" checked>
         <span class="switch-track"><span class="switch-knob"></span></span>
       </label></div>
-    <div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;box-sizing:border-box;"><span style="font-size:13px;font-weight:500;">通信日志</span><label class="switch" style="flex-shrink:0;margin-right:2px;">
+    <div class="card tgl-row"><span style="font-size:13px;font-weight:500;">通信日志</span><label class="switch" style="flex-shrink:0;margin-right:2px;">
         <input type="checkbox" id="logCardToggle" checked>
         <span class="switch-track"><span class="switch-knob"></span></span>
       </label></div>
