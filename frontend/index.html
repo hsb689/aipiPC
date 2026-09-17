@@ -206,7 +206,7 @@ body {
 </head>
 <body>
 <div class="header">
-  <h1>AiPi 加热台上位机 <span style="font-size:0.55em;font-weight:600;color:var(--fg2);vertical-align:middle;">V0.1</span></h1>
+  <h1>AiPi 加热台上位机 <span style="font-size:0.55em;font-weight:600;color:var(--fg2);vertical-align:middle;">V0.1</span><span id="updBadge" style="display:none;font-size:0.5em;font-weight:600;padding:2px 8px;border-radius:10px;vertical-align:middle;margin-left:8px;"></span></h1>
   <div style="display:flex;align-items:center;gap:10px;">
     <div class="status-pill"><span class="status-dot" id="dot"></span><span id="connText">未连接</span></div>
     <select id="themeSel" class="theme-sel">
@@ -394,16 +394,33 @@ const listen = window.__TAURI__.event.listen;
 // ---- Check for updates (GitHub Releases) ----
 const APP_VERSION='V0.1';
 const UPDATE_URL='https://github.com/hsb689/aipiPC/releases/latest';
+function setUpdBadge(state){ // 'ok' | 'new'
+  const el=document.getElementById('updBadge'); if(!el) return;
+  if(state==='new'){
+    el.textContent='有更新';
+    el.style.background='rgba(255,69,58,.18)';
+    el.style.color='#ff453a';
+    el.style.cursor='pointer';
+    el.title='点击打开最新版发布页';
+    el.onclick=()=>{ try{ window.__TAURI__.shell.open(UPDATE_URL); }catch(e){ window.open(UPDATE_URL,'_blank'); } };
+  }else{
+    el.textContent='已是最新';
+    el.style.background='rgba(48,209,88,.15)';
+    el.style.color='#30d158';
+    el.style.cursor='default';
+    el.title='';
+    el.onclick=null;
+  }
+  el.style.display='inline-block';
+}
 async function checkForUpdate(){
   try{
     const r=await fetch('https://api.github.com/repos/hsb689/aipiPC/releases/latest',{cache:'no-store'});
-    if(!r.ok) return;
+    if(!r.ok){ return; }
     const j=await r.json();
     const tag=(j.tag_name||'').replace(/^v/i,'V');
-    if(tag && tag!=='V0.1'){
-      log('info','发现新版本 '+tag+'(当前 '+APP_VERSION+'),下载: '+UPDATE_URL);
-    }
-  }catch(e){ /* offline or blocked: silently ignore */ }
+    if(tag && tag!==APP_VERSION){ setUpdBadge('new'); } else { setUpdBadge('ok'); }
+  }catch(e){ /* offline: leave badge hidden */ }
 }
 setTimeout(checkForUpdate, 2500);
 
