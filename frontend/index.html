@@ -170,7 +170,12 @@ body {
   padding: 8px; font-size: 11px; font-family: "SF Mono", Menlo, monospace;
   height: 120px; overflow-y: auto;
   line-height: 1.6;
+  scrollbar-color: var(--bg3) transparent;
 }
+.log-box::-webkit-scrollbar { width:8px; }
+.log-box::-webkit-scrollbar-track { background:transparent; }
+.log-box::-webkit-scrollbar-thumb { background:var(--bg3); border-radius:4px; }
+.log-box::-webkit-scrollbar-thumb:hover { background:var(--border); }
 .log-entry { border-bottom: 1px solid var(--border); padding: 2px 0; }
 .log-entry:last-child { border-bottom: none; }
 .mode-bar { display:flex; gap:4px; margin-bottom:12px; }
@@ -207,7 +212,7 @@ body {
 </head>
 <body>
 <div class="header">
-  <span id="updBadge">V0.2</span>
+  <span id="updBadge">V0.3</span>
   <div style="display:flex;align-items:center;gap:10px;">
     <div class="status-pill"><span class="status-dot" id="dot"></span><span id="connText">未连接</span></div>
     <select id="themeSel" class="theme-sel">
@@ -362,6 +367,8 @@ body {
       </div>
     </div>
     <div class="card" data-panel="other">
+      <div class="field"><label>风扇 PWM (当前: <span id="cvFanPwm">--</span>)</label><input id="iFanPwm" type="number" value="95" min="0" max="100" step="5"></div>
+      <div class="field"><label>LED 亮度 (当前: <span id="cvLed">--</span>)</label><input id="iLed" type="number" value="100" min="0" max="100" step="5"></div>
       <div class="field"><label>温度补偿 (当前: <span id="cvTcomp">--</span>)</label><input id="iTcomp" type="number" value="0"></div>
       <div class="field"><label>自动关机 (当前: <span id="cvAoff">--</span>s)</label><input id="iAoff" type="number" value="600"></div>
       <button class="btn btn-primary" id="btnSendOther" style="width:100%">写入其他设置</button>
@@ -393,7 +400,7 @@ const listen = window.__TAURI__.event.listen;
 
 
 // ---- Check for updates (GitHub Releases) ----
-const APP_VERSION='V0.2';
+const APP_VERSION='V0.3';
 const UPDATE_URL='https://github.com/hsb689/aipiPC/releases/latest';
 function setUpdBadge(state){
   const el=document.getElementById('updBadge'); if(!el) return;
@@ -428,10 +435,10 @@ setTimeout(checkForUpdate, 2500);
 const CMD={SET_WORK_MODE:0x00,SET_TARGET_TEMP:0x01,SET_PRESET1:0x02,SET_PRESET2:0x03,SET_PRESET3:0x04,
   SET_TCOMP:0x05,SET_ASHUT:0x06,SET_HEATER:0x07,RF_PREHEAT_T:0x10,RF_KEEP_T:0x11,RF_REFLOW_T:0x12,
   RF_PREHEAT_TM:0x13,RF_KEEP_TM:0x14,RF_REFLOW_TM:0x15,PID_KP:0x20,PID_KI:0x21,PID_KD:0x22,
-  POWER_LIMIT:0x26,SAVE:0xF0,LOAD_DEFAULT:0xF1,REBOOT:0xF2};
+  POWER_LIMIT:0x26,FAN_PWM:0x27,LED_BRIGHT:0x28,SAVE:0xF0,LOAD_DEFAULT:0xF1,REBOOT:0xF2};
 const SID={CUR_TEMP:0x40,SET_TEMP:0x41,HEATER:0x42,VIN:0x43,MODE:0x47,WORK_SEC:0x48,PWR:0x49,
   VOUT:0x4A,IOUT:0x4B,RES:0x4C,VPWM:0x4D,IPWM:0x4E,SUMMARY:0x4F,SUM_B:0x57,ELEC:0x58,
-  CFG_BASIC_A:0x50,CFG_BASIC_B:0x51,CFG_OTHER:0x52,CFG_REFLOW_A:0x53,CFG_REFLOW_B:0x54,CFG_HEATER:0x59};
+  CFG_BASIC_A:0x50,CFG_BASIC_B:0x51,CFG_OTHER:0x52,CFG_REFLOW_A:0x53,CFG_REFLOW_B:0x54,CFG_HEATER:0x59,CFG_HEATER_B:0x5A};
 const DT={CONFIG:0x02,STATUS:0x03,U8:0x10,U16:0x11,I16:0x12,U32:0x13,FLOAT:0x14};
 
 let connected=false, heating=false, workMode=0, scanning=false, vpwmDuty=0, ipwmDuty=0;
@@ -487,7 +494,7 @@ function onNotify(data) {
   if(type===DT.STATUS){
     const keyMap={[SID.SUMMARY]:'summary',[SID.SUM_B]:'summary_b',[SID.ELEC]:'elec',
       [SID.CFG_BASIC_A]:'cfg_a',[SID.CFG_BASIC_B]:'cfg_b',[SID.CFG_OTHER]:'cfg_other',
-      [SID.CFG_REFLOW_A]:'cfg_rf_a',[SID.CFG_REFLOW_B]:'cfg_rf_b',[SID.CFG_HEATER]:'cfg_heat'};
+      [SID.CFG_REFLOW_A]:'cfg_rf_a',[SID.CFG_REFLOW_B]:'cfg_rf_b',[SID.CFG_HEATER]:'cfg_heat',[SID.CFG_HEATER_B]:'cfg_heat_b'};
     const key=keyMap[id];
     if(key){log('notify',hex(b),key);parseSummary(b);}
   } else if(type>=DT.U8&&type<=DT.FLOAT){
@@ -532,6 +539,8 @@ function parseSummary(b){
       case CMD.POWER_LIMIT: if(flen>=2){const v=d[0]|(d[1]<<8);$('cvPlim').textContent=v;$('iPlim').value=v;} break;
       case CMD.SET_TCOMP: if(flen>=2){let v=d[0]|(d[1]<<8);if(v>32767)v-=65536;$('cvTcomp').textContent=v;$('iTcomp').value=v;} break;
       case CMD.SET_ASHUT: if(flen>=4){const v=(d[0]|(d[1]<<8)|(d[2]<<16)|(d[3]<<24))>>>0;$('cvAoff').textContent=v;$('iAoff').value=v;} break;
+      case CMD.FAN_PWM: if(flen>=1){const v=d[0];$('cvFanPwm').textContent=v+'%';$('iFanPwm').value=v;} break;
+      case CMD.LED_BRIGHT: if(flen>=1){const v=d[0];$('cvLed').textContent=v+'%';$('iLed').value=v;} break;
     }
     }catch(e){}
     o+=2+flen;
@@ -566,6 +575,8 @@ function parseConfigSingle(b){
     case CMD.POWER_LIMIT: {const v=vU16();if(v!=null){$('cvPlim').textContent=v;$('iPlim').value=v;}} break;
     case CMD.SET_TCOMP: {const v=vI16();if(v!=null){$('cvTcomp').textContent=v;$('iTcomp').value=v;}} break;
     case CMD.SET_ASHUT: {const v=vU32();if(v!=null){$('cvAoff').textContent=v;$('iAoff').value=v;}} break;
+    case CMD.FAN_PWM: {if(val.length>=1){const v=val[0];$('cvFanPwm').textContent=v+'%';$('iFanPwm').value=v;}} break;
+    case CMD.LED_BRIGHT: {if(val.length>=1){const v=val[0];$('cvLed').textContent=v+'%';$('iLed').value=v;}} break;
   }
 }
 function updateHeatBtn(){
@@ -698,6 +709,8 @@ $('btnSendPid').addEventListener('click',()=>{
   writeCmd(CMD.PID_KD,f32(rd('iKd')),'KD');
 });
 $('btnSendOther').addEventListener('click',()=>{
+  writeCmd(CMD.FAN_PWM,[Math.max(0,Math.min(100,rd('iFanPwm')))&0xFF],'风扇 PWM '+rd('iFanPwm')+'%');
+  writeCmd(CMD.LED_BRIGHT,[Math.max(0,Math.min(100,rd('iLed')))&0xFF],'LED 亮度 '+rd('iLed')+'%');
   writeCmd(CMD.SET_TCOMP,i16(rd('iTcomp')),'温补');
   writeCmd(CMD.SET_ASHUT,u32(rd('iAoff')),'自动关机');
 });

@@ -170,12 +170,17 @@ async fn ble_connect(
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     target.discover_services().await.map_err(|e| format!("discover: {e}"))?;
 
-    let service_uuid = Uuid::parse_str(BLE_SERVICE_UUID).unwrap();
     let write_uuid = Uuid::parse_str(BLE_WRITE_UUID).unwrap();
     let notify_uuid = Uuid::parse_str(BLE_NOTIFY_UUID).unwrap();
 
     let chars = target.characteristics();
-    let has_write = chars.iter().any(|c| c.uuid == write_uuid && c.service_uuid == service_uuid);
+    for c in &chars {
+        eprintln!("[BLE] char uuid={} service={:?} props={:?}", c.uuid, c.service_uuid, c.properties);
+    }
+    // Match by characteristic UUID only: on Windows btleplug may report
+    // service_uuid in a different form (128-bit expanded / nil) after a
+    // firmware GATT change, which breaks exact service_uuid equality.
+    let has_write = chars.iter().any(|c| c.uuid == write_uuid);
     if !has_write { return Err("Write characteristic not found".into()); }
 
     let p_clone = target.clone();
@@ -184,7 +189,7 @@ async fn ble_connect(
     // Set up notification stream BEFORE subscribing
     let mut events = p_clone.notifications().await.map_err(|e| format!("notifications: {e}"))?;
 
-    if let Some(ch) = chars.iter().find(|c| c.uuid == notify_uuid && c.service_uuid == service_uuid) {
+    if let Some(ch) = chars.iter().find(|c| c.uuid == notify_uuid) {
         // Force CCCD refresh: unsubscribe first, then subscribe
         let _ = target.unsubscribe(ch).await;
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
@@ -260,10 +265,9 @@ async fn ble_disconnect(state: tauri::State<'_, SharedBle>) -> Result<(), String
 async fn ble_write(state: tauri::State<'_, SharedBle>, data: Vec<u8>) -> Result<(), String> {
     let s = state.lock().await;
     let p = s.peripheral.as_ref().ok_or("Not connected")?;
-    let service_uuid = Uuid::parse_str(BLE_SERVICE_UUID).unwrap();
     let write_uuid = Uuid::parse_str(BLE_WRITE_UUID).unwrap();
     let chars = p.characteristics();
-    let ch = chars.iter().find(|c| c.uuid == write_uuid && c.service_uuid == service_uuid)
+    let ch = chars.iter().find(|c| c.uuid == write_uuid)
         .ok_or("Write characteristic not found")?;
     p.write(ch, &data, WriteType::WithoutResponse).await.map_err(|e| format!("write: {e}"))
 }
