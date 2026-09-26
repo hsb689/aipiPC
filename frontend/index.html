@@ -224,11 +224,28 @@ body {
 .tgl-row{display:flex!important;align-items:center;justify-content:space-between!important;gap:12px;width:100%;box-sizing:border-box;}
 #updBadge{display:inline-block!important;font-size:15px!important;font-weight:600!important;padding:4px 14px!important;border-radius:14px!important;vertical-align:middle!important;background:#e8e8ed!important;color:#6e6e73!important;border:1px solid #d1d1d6!important;}
 #updBadge.upd-new{background:#ffd9d6!important;color:#c9302c!important;border:1px solid #ffb3ae!important;}
+/* 右下角提醒卡片 */
+#toastStack{position:fixed;right:14px;bottom:14px;z-index:3000;display:flex;flex-direction:column;gap:8px;align-items:flex-end;pointer-events:none;}
+.toast{min-width:210px;max-width:300px;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,0.22);padding:9px 12px 11px;pointer-events:auto;position:relative;overflow:hidden;transform:translateX(calc(100% + 24px));transition:transform .28s ease,opacity .28s ease;}
+.toast.show{transform:translateX(0);}
+.toast.hide{transform:translateX(calc(100% + 24px));opacity:0;}
+.toast-title{font-size:13px;font-weight:600;}
+.toast-msg{font-size:12px;color:var(--fg2);margin-top:2px;word-break:break-all;}
+.toast-bar{position:absolute;left:0;bottom:0;height:3px;width:100%;transform-origin:left;animation-name:toastbar;animation-timing-function:linear;animation-fill-mode:forwards;background:var(--accent);}
+@keyframes toastbar{from{transform:scaleX(1);}to{transform:scaleX(0);}}
+.toast.success .toast-title{color:var(--green);}
+.toast.success .toast-bar{background:var(--green);}
+.toast.info .toast-title{color:var(--accent);}
+.toast.info .toast-bar{background:var(--accent);}
+.toast.warn .toast-title{color:var(--red);}
+.toast.warn .toast-bar{background:var(--red);}
+/* 回流焊阶段卡片高亮 */
+.temp-card.phase-active{border-color:var(--accent);background:var(--accent-bg);}
 </style>
 </head>
 <body>
 <div class="header">
-  <span id="updBadge">V0.3</span>
+  <span id="updBadge">V0.4</span>
   <div style="display:flex;align-items:center;gap:10px;">
     <div class="status-pill"><span class="status-dot" id="dot"></span><span id="connText">未连接</span></div>
     <select id="themeSel" class="theme-sel">
@@ -319,7 +336,7 @@ body {
             <div class="temp-label">阶段3 回流</div>
             <div class="target-val" id="rfPhase3">-- ℃ / --s</div>
           </div>
-          <div class="temp-card">
+          <div class="temp-card" id="rfPhase4">
             <div class="temp-label">阶段4 冷却</div>
             <div class="target-val" style="font-size:clamp(12px,1vw,16px);">回落至常温</div>
           </div>
@@ -412,6 +429,7 @@ body {
     </div>
   </div>
 </div>
+<div id="toastStack"></div>
 <script>
 const $=id=>document.getElementById(id);
 // Theme
@@ -430,9 +448,16 @@ $('themeSel').addEventListener('change',e=>applyTheme(e.target.value));
 const invoke = window.__TAURI__.core.invoke;
 const listen = window.__TAURI__.event.listen;
 
+// 禁用右键菜单、F5/Ctrl+R 刷新、F12/Ctrl+Shift+I 开发者工具
+document.addEventListener('contextmenu',e=>e.preventDefault());
+document.addEventListener('keydown',e=>{
+  const k=(e.key||'').toLowerCase();
+  if(k==='f5'||k==='f12'||(e.ctrlKey&&k==='r')||(e.ctrlKey&&e.shiftKey&&k==='i'))e.preventDefault();
+});
+
 
 // ---- Check for updates (GitHub Releases) ----
-const APP_VERSION='V0.3';
+const APP_VERSION='V0.4';
 const UPDATE_URL='https://github.com/hsb689/aipiPC/releases/latest';
 function setUpdBadge(state){
   const el=document.getElementById('updBadge'); if(!el) return;
@@ -490,13 +515,41 @@ const SID={CUR_TEMP:0x40,SET_TEMP:0x41,HEATER:0x42,VIN:0x43,MODE:0x47,WORK_SEC:0
   VOUT:0x4A,IOUT:0x4B,RES:0x4C,VPWM:0x4D,IPWM:0x4E,SUMMARY:0x4F,SUM_B:0x57,ELEC:0x58,
   CFG_BASIC_A:0x50,CFG_BASIC_B:0x51,CFG_OTHER:0x52,CFG_REFLOW_A:0x53,CFG_REFLOW_B:0x54,CFG_HEATER:0x59,CFG_HEATER_B:0x5A};
 const DT={CONFIG:0x02,STATUS:0x03,U8:0x10,U16:0x11,I16:0x12,U32:0x13,FLOAT:0x14};
+// 下发命令 ID -> 中文标签(用于日志解码与提醒卡片)
+const CMD_LABELS={[CMD.SET_WORK_MODE]:'工作模式',[CMD.SET_TARGET_TEMP]:'目标温度',[CMD.SET_PRESET1]:'预设1',[CMD.SET_PRESET2]:'预设2',[CMD.SET_PRESET3]:'预设3',
+  [CMD.SET_TCOMP]:'温度补偿',[CMD.SET_ASHUT]:'自动关机',[CMD.SET_HEATER]:'加热开关',[CMD.RF_PREHEAT_T]:'预热温度',[CMD.RF_PREHEAT_TM]:'预热时间',
+  [CMD.RF_KEEP_T]:'恒温温度',[CMD.RF_KEEP_TM]:'恒温时间',[CMD.RF_REFLOW_T]:'回流温度',[CMD.RF_REFLOW_TM]:'回流时间',
+  [CMD.PID_KP]:'KP',[CMD.PID_KI]:'KI',[CMD.PID_KD]:'KD',[CMD.POWER_LIMIT]:'工作功率',
+  [CMD.FAN_PWM]:'风扇PWM',[CMD.LED_BRIGHT]:'LED亮度',[CMD.FAN_MODE]:'风扇模式'};
+
+/* ===== 右下角滑入式提醒卡片 =====
+   等级: success=绿(成功/一般) info=蓝(一般) warn=红(警告/错误)
+   从右下角滑入, 底部进度条倒计时结束后向右滑出; 多条时向上堆叠 */
+const toastLast={};
+function toast(level,title,msg,opts={}){
+  const now=Date.now();
+  if(opts.key){const cd=opts.cooldown??10000;if(toastLast[opts.key]&&now-toastLast[opts.key]<cd)return;toastLast[opts.key]=now;}
+  const stack=$('toastStack'); if(!stack)return;
+  while(stack.children.length>=5)stack.firstChild.remove();
+  const dur=opts.dur||(level==='warn'?6000:3000);
+  const el=document.createElement('div');
+  el.className='toast '+level;
+  el.innerHTML='<div class="toast-title">'+title+'</div>'+(msg?'<div class="toast-msg">'+msg+'</div>':'')
+    +'<div class="toast-bar" style="animation-duration:'+dur+'ms"></div>';
+  stack.appendChild(el);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>el.classList.add('show')));
+  setTimeout(()=>{el.classList.add('hide');setTimeout(()=>el.remove(),320);},dur);
+}
 
 let connected=false, heating=false, workMode=0, scanning=false, vpwmDuty=0, ipwmDuty=0;
 const ENABLE_PWM_DISPLAY=true;
 function calcRes(){
   const v=parseFloat($('vOut').textContent), i=parseFloat($('iOut').textContent);
   if(isNaN(v)||isNaN(i)||i<=0){$('res').textContent='-- Ω';return;}
-  $('res').textContent=(v/i).toFixed(2)+' Ω';
+  const r=v/i;
+  $('res').textContent=r.toFixed(2)+' Ω';
+  // 加热中电阻低于 0.1Ω: 发热片短路
+  if(heating&&r<0.1)toast('warn','加热片疑似短路','发热片电阻 '+r.toFixed(2)+'Ω 过低, 请立即断电检查',{key:'short',cooldown:20000});
 }
 const stickyMap={};
 // Surface any runtime JS error in the comm log so renderer issues are visible
@@ -531,11 +584,11 @@ function f32(v){const b=new ArrayBuffer(4);new DataView(b).setFloat32(0,Number(v
 function rd(id){return Number($(id)?.value||0);}
 
 async function writeCmd(cmdId, payload, label) {
-  if(!connected){log('error','未连接');return;}
+  if(!connected){log('error','未连接');return false;}
   const p=payload||[];
   const frame=new Uint8Array(2+p.length); frame[0]=cmdId; frame[1]=p.length; frame.set(p,2);
-  try{await invoke('ble_write',{data:Array.from(frame)});log('write',label+' ['+hex(frame)+']');}
-  catch(e){log('error',label+' 失败: '+e);}
+  try{await invoke('ble_write',{data:Array.from(frame)});log('write',label+' ['+hex(frame)+']');return true;}
+  catch(e){log('error',label+' 失败: '+e);toast('warn','发送失败',label,{key:'send-fail',cooldown:3000});return false;}
 }
 
 function onNotify(data) {
@@ -548,8 +601,10 @@ function onNotify(data) {
     const key=keyMap[id];
     if(key){log('notify',hex(b),key);parseSummary(b);}
   } else if(type>=DT.U8&&type<=DT.FLOAT){
-    log('notify',hex(b),'cfg_single_'+id);
+    const lbl=CMD_LABELS[id]||('0x'+id.toString(16).toUpperCase().padStart(2,'0'));
+    log('notify','配置回包['+lbl+'] '+hex(b),'cfg_single_'+id);
     parseConfigSingle(b);
+    if(id!==CMD.SET_HEATER)toast('success','发送成功',lbl,{key:'ack-'+id,cooldown:2000});
   } else {
     log('notify',hex(b));
   }
@@ -562,10 +617,11 @@ function parseSummary(b){
     const d=b.slice(o+2,o+2+flen);
     try{
     switch(fid){
-      case SID.CUR_TEMP: if(flen>=2){const v=d[0]|(d[1]<<8);$('curTemp').textContent=v;const er=$('curTempR');if(er)er.textContent=v;} break;
+      case SID.CUR_TEMP: if(flen>=2){const v=d[0]|(d[1]<<8);$('curTemp').textContent=v;const er=$('curTempR');if(er)er.textContent=v;checkTempWarnings(v);} break;
       case SID.SET_TEMP: if(flen>=2){const v=d[0]|(d[1]<<8);$('setTemp').textContent=v+' ℃';$('cvTarget').textContent=v;} break;
-      case SID.HEATER: heating=d[0]===1; updateHeatBtn(); break;
+      case SID.HEATER: heating=d[0]===1; updateHeatBtn(); if(heating){heatWatch.maxTemp=null;heatWatch.lastRise=Date.now();reflowSeconds=0;} updateReflowPhase(); break;
       case SID.MODE: workMode=d[0]; updateModeUI(); break;
+      case SID.WORK_SEC: if(flen>=4){reflowSeconds=(d[0]|(d[1]<<8)|(d[2]<<16)|(d[3]<<24))>>>0;updateReflowPhase();} break;
       case SID.VIN: if(flen>=2){const v=(d[0]|(d[1]<<8))/100;$('vIn').textContent=v.toFixed(2)+' V';} break;
       case SID.PWR: if(flen>=2){const v=(d[0]|(d[1]<<8))/100;$('pwr').textContent=v.toFixed(1)+' W';} break;
       case SID.VOUT: if(flen>=2){const v=(d[0]|(d[1]<<8))/100;$('vOut').textContent=v.toFixed(2)+' V';calcRes();} break;
@@ -600,6 +656,7 @@ function parseSummary(b){
   const target=parseFloat($('setTemp').textContent);
   if(!isNaN(temp)&&!isNaN(target)&&target>0){$('tempBar').style.width=Math.min(100,temp/target*100)+'%';}
   drawReflowCurve(); drawReflowPhaseCards();
+  updateReflowPhase();
 }
 function parseConfigSingle(b){
   if(b.length<4)return;
@@ -631,6 +688,50 @@ function parseConfigSingle(b){
     case CMD.FAN_MODE: {if(val.length>=1){const v=val[0];if(v===0||v===1){$('cvFanMode').textContent=v===1?'降温':'散热';$('iFanMode').value=String(v);}}} break;
   }
 }
+
+/* ===== 回流焊阶段跟踪: 阶段卡片高亮 + 进入阶段提醒 ===== */
+let reflowSeconds=0, reflowPhase='';
+const PHASE_DEFS={preheat:['预热','rfPhase1'],keep:['恒温','rfPhase2'],reflow:['回流','rfPhase3'],cool:['冷却','rfPhase4']};
+function getReflowPhase(){
+  if(workMode!==1||!heating)return '';
+  const ptt=rd('iRfPTT')||60, ktt=rd('iRfKTT')||60, rtt=rd('iRfRTT')||30;
+  if(reflowSeconds<ptt)return 'preheat';
+  if(reflowSeconds<ptt+ktt)return 'keep';
+  if(reflowSeconds<ptt+ktt+rtt)return 'reflow';
+  return 'cool';
+}
+function updateReflowPhase(){
+  const ph=getReflowPhase();
+  for(const k in PHASE_DEFS){
+    const el=$(PHASE_DEFS[k][1]); if(el)el.classList.toggle('phase-active',k===ph);
+  }
+  if(ph&&ph!==reflowPhase){
+    const name=PHASE_DEFS[ph][0];
+    const info={preheat:rd('iRfPT')+'℃ / '+rd('iRfPTT')+'s',keep:rd('iRfKT')+'℃ / '+rd('iRfKTT')+'s',
+      reflow:rd('iRfRT')+'℃ / '+rd('iRfRTT')+'s',cool:'停热回落至常温'}[ph];
+    toast('info','回流焊进入'+name+'段',info,{key:'phase-'+ph,cooldown:8000});
+  }
+  reflowPhase=ph;
+}
+
+/* ===== 温度相关告警 ===== */
+let heatWatch={maxTemp:null,lastRise:0};
+function checkTempWarnings(v){
+  const now=Date.now();
+  // 温度探头异常: 协议约定 >500℃ 为异常值
+  if(v>500){toast('warn','温度探头异常','上报温度 '+v+'℃ 超出量程, 请检查温度探头',{key:'sensor',cooldown:20000});return;}
+  const target=parseFloat($('setTemp').textContent)||0;
+  // 温度超过目标 10℃ 以上
+  if(target>0&&v>target+10){toast('warn','温度超目标','当前 '+v+'℃, 已超过目标 '+target+'℃ 十度以上',{key:'overtemp',cooldown:15000});}
+  // 加热中但温度长时间(6s)未上升, 且明显低于目标: 加热器可能故障
+  if(heating){
+    if(heatWatch.maxTemp==null||v>heatWatch.maxTemp+0.4){heatWatch.maxTemp=v;heatWatch.lastRise=now;}
+    else if(target>0&&v<target-10&&now-heatWatch.lastRise>6000){
+      toast('warn','加热异常','已开启加热但温度持续未上升, 请检查加热器',{key:'norise',cooldown:20000});
+      heatWatch.lastRise=now;
+    }
+  }else{heatWatch.maxTemp=null;}
+}
 function updateHeatBtn(){
   const t=$('btnHeat'),t2=$('btnHeatR');
   t.textContent=heating?'关闭加热':'开启加热';
@@ -644,6 +745,7 @@ function updateModeUI(){
   $('modeReflow').classList.toggle('active',workMode===1);
   $('viewConst').style.display=workMode===0?'':'none';
   $('viewReflow').style.display=workMode===1?'':'none';
+  updateReflowPhase();
 }
 // Device picker modal: click a device row to connect directly
 function pickDevice(devs){
@@ -723,7 +825,10 @@ $('btnConn').addEventListener('click', async()=>{
 async function toggleHeat(){
   heating=!heating;
   updateHeatBtn();
-  await writeCmd(CMD.SET_HEATER,[heating?1:0],heating?'开启加热':'关闭加热');
+  if(heating){heatWatch.maxTemp=null;heatWatch.lastRise=Date.now();reflowSeconds=0;}
+  updateReflowPhase();
+  const ok=await writeCmd(CMD.SET_HEATER,[heating?1:0],heating?'开启加热':'关闭加热');
+  if(ok)toast('success',heating?'开始加热':'已关闭加热',heating?('目标 '+$('setTemp').textContent):'',{key:'heat',cooldown:1500});
 }
 $('btnHeat').addEventListener('click',toggleHeat);
 $('btnHeatR').addEventListener('click',toggleHeat);
