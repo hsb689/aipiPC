@@ -145,6 +145,21 @@ body {
   font-family: inherit; outline: none;
 }
 .field input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
+.field select {
+  width:100%; padding:6px 8px; border-radius:6px; font-size:13px;
+  border:1px solid var(--border); background: var(--bg); color: var(--fg);
+  font-family: inherit; outline: none;
+}
+.field select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
+.field select option { background: var(--card); color: var(--fg); }
+.field-row { display:flex; gap:6px; }
+.field-row input, .field-row select { flex:1; min-width:0; }
+.btn-mini {
+  padding:5px 12px; border:none; border-radius:6px;
+  background: var(--accent); color:#fff; font-size:12px;
+  font-family:inherit; cursor:pointer; flex-shrink:0;
+}
+.btn-mini:active { transform:scale(0.97); }
 .btn-row { display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; }
 .preset-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin-top:10px; }
 .const-layout { display:flex; gap:12px; height:clamp(180px,32vh,320px); }
@@ -208,6 +223,7 @@ body {
 .log-info { color: #8fd694 !important; }
 .tgl-row{display:flex!important;align-items:center;justify-content:space-between!important;gap:12px;width:100%;box-sizing:border-box;}
 #updBadge{display:inline-block!important;font-size:15px!important;font-weight:600!important;padding:4px 14px!important;border-radius:14px!important;vertical-align:middle!important;background:#e8e8ed!important;color:#6e6e73!important;border:1px solid #d1d1d6!important;}
+#updBadge.upd-new{background:#ffd9d6!important;color:#c9302c!important;border:1px solid #ffb3ae!important;}
 </style>
 </head>
 <body>
@@ -367,11 +383,27 @@ body {
       </div>
     </div>
     <div class="card" data-panel="other">
-      <div class="field"><label>风扇 PWM (当前: <span id="cvFanPwm">--</span>)</label><input id="iFanPwm" type="number" value="95" min="0" max="100" step="5"></div>
-      <div class="field"><label>LED 亮度 (当前: <span id="cvLed">--</span>)</label><input id="iLed" type="number" value="100" min="0" max="100" step="5"></div>
-      <div class="field"><label>温度补偿 (当前: <span id="cvTcomp">--</span>)</label><input id="iTcomp" type="number" value="0"></div>
-      <div class="field"><label>自动关机 (当前: <span id="cvAoff">--</span>s)</label><input id="iAoff" type="number" value="600"></div>
-      <button class="btn btn-primary" id="btnSendOther" style="width:100%">写入其他设置</button>
+      <div class="field"><label>风扇 PWM (当前: <span id="cvFanPwm">--</span>)</label>
+        <div class="field-row"><input id="iFanPwm" type="number" value="95" min="0" max="100" step="5"><button class="btn-mini" id="btnFanPwm">发送</button></div>
+      </div>
+      <div class="field"><label>LED 亮度 (当前: <span id="cvLed">--</span>)</label>
+        <div class="field-row"><input id="iLed" type="number" value="100" min="0" max="100" step="5"><button class="btn-mini" id="btnLed">发送</button></div>
+      </div>
+      <div class="field"><label>风扇模式 (当前: <span id="cvFanMode">--</span>)</label>
+        <div class="field-row">
+          <select id="iFanMode">
+            <option value="0">散热</option>
+            <option value="1">降温</option>
+          </select>
+          <button class="btn-mini" id="btnFanMode">发送</button>
+        </div>
+      </div>
+      <div class="field"><label>温度补偿 (当前: <span id="cvTcomp">--</span>)</label>
+        <div class="field-row"><input id="iTcomp" type="number" value="0"><button class="btn-mini" id="btnTcomp">发送</button></div>
+      </div>
+      <div class="field"><label>自动关机 (当前: <span id="cvAoff">--</span>s)</label>
+        <div class="field-row"><input id="iAoff" type="number" value="600"><button class="btn-mini" id="btnAoff">发送</button></div>
+      </div>
       <div class="danger-zone">
         <h4>恢复出厂设置</h4>
         <p>所有参数将恢复为默认值并保存到 Flash</p>
@@ -404,38 +436,56 @@ const APP_VERSION='V0.3';
 const UPDATE_URL='https://github.com/hsb689/aipiPC/releases/latest';
 function setUpdBadge(state){
   const el=document.getElementById('updBadge'); if(!el) return;
+  // 必须用 class 切换: #updBadge 的背景/文字/边框是 !important 规则,
+  // 内联样式(el.style.*)无法覆盖, 之前"new"状态因此永远显示不出来
   if(state==='new'){
-    el.style.background='#ffd9d6';
-    el.style.color='#c9302c';
-    el.style.border='1px solid #ffb3ae';
-    el.style.cursor='pointer';
+    el.classList.add('upd-new');
     el.title='有新版本，点击前往 GitHub 下载';
     el.onclick=()=>{ try{ window.__TAURI__.shell.open(UPDATE_URL); }catch(e){ window.open(UPDATE_URL,'_blank'); } };
   }else{
-    el.style.background='#e8e8ed';
-    el.style.color='#6e6e73';
-    el.style.border='1px solid #d1d1d6';
-    el.style.cursor='default';
+    el.classList.remove('upd-new');
     el.title='';
     el.onclick=null;
   }
   el.style.display='inline-block';
 }
+// 数值化比较版本号: "V0.3.0"与"V0.3"视为相同, "v0.4"/"V0.4.1">"V0.3" 触发提示
+function verNums(s){return (String(s).match(/\d+/g)||[]).map(Number);}
+function isNewerVer(a,b){
+  const A=verNums(a), B=verNums(b), n=Math.max(A.length,B.length);
+  for(let i=0;i<n;i++){ const x=A[i]||0, y=B[i]||0; if(x!==y)return x>y; }
+  return false;
+}
+let updRetryTimer=null;
+function scheduleUpdRetry(delayMs){
+  if(updRetryTimer)clearTimeout(updRetryTimer);
+  updRetryTimer=setTimeout(checkForUpdate,delayMs);
+}
 async function checkForUpdate(){
   try{
     const r=await fetch('https://api.github.com/repos/hsb689/aipiPC/releases/latest',{cache:'no-store'});
-    if(!r.ok){ return; }
+    if(r.status===403||r.status===429){
+      // 匿名限额(60次/小时/IP)耗尽: 按 x-ratelimit-reset 安排重试, 否则1小时后重试
+      const reset=Number(r.headers.get('x-ratelimit-reset'))||0;
+      const wait=reset>0?(reset*1000)-Date.now()+5000:3600000;
+      scheduleUpdRetry(Math.min(Math.max(wait,5000),3600000));
+      return;
+    }
+    if(!r.ok){ scheduleUpdRetry(120000); return; }
     const j=await r.json();
-    const tag=(j.tag_name||'').replace(/^v/i,'V');
-    if(tag && tag!==APP_VERSION){ setUpdBadge('new'); } else { setUpdBadge('ok'); }
-  }catch(e){ /* offline: leave badge hidden */ }
+    const tag=String(j.tag_name||'').trim();
+    if(tag && isNewerVer(tag,APP_VERSION)){ setUpdBadge('new'); }
+    else { setUpdBadge('ok'); }
+  }catch(e){
+    scheduleUpdRetry(120000); /* 离线/网络异常: 2分钟后重试 */
+  }
 }
 setTimeout(checkForUpdate, 2500);
 
 const CMD={SET_WORK_MODE:0x00,SET_TARGET_TEMP:0x01,SET_PRESET1:0x02,SET_PRESET2:0x03,SET_PRESET3:0x04,
   SET_TCOMP:0x05,SET_ASHUT:0x06,SET_HEATER:0x07,RF_PREHEAT_T:0x10,RF_KEEP_T:0x11,RF_REFLOW_T:0x12,
   RF_PREHEAT_TM:0x13,RF_KEEP_TM:0x14,RF_REFLOW_TM:0x15,PID_KP:0x20,PID_KI:0x21,PID_KD:0x22,
-  POWER_LIMIT:0x26,FAN_PWM:0x27,LED_BRIGHT:0x28,SAVE:0xF0,LOAD_DEFAULT:0xF1,REBOOT:0xF2};
+  POWER_LIMIT:0x26,FAN_PWM:0x27,LED_BRIGHT:0x28,FAN_MODE:0x29,SAVE:0xF0,LOAD_DEFAULT:0xF1,REBOOT:0xF2};
 const SID={CUR_TEMP:0x40,SET_TEMP:0x41,HEATER:0x42,VIN:0x43,MODE:0x47,WORK_SEC:0x48,PWR:0x49,
   VOUT:0x4A,IOUT:0x4B,RES:0x4C,VPWM:0x4D,IPWM:0x4E,SUMMARY:0x4F,SUM_B:0x57,ELEC:0x58,
   CFG_BASIC_A:0x50,CFG_BASIC_B:0x51,CFG_OTHER:0x52,CFG_REFLOW_A:0x53,CFG_REFLOW_B:0x54,CFG_HEATER:0x59,CFG_HEATER_B:0x5A};
@@ -541,6 +591,7 @@ function parseSummary(b){
       case CMD.SET_ASHUT: if(flen>=4){const v=(d[0]|(d[1]<<8)|(d[2]<<16)|(d[3]<<24))>>>0;$('cvAoff').textContent=v;$('iAoff').value=v;} break;
       case CMD.FAN_PWM: if(flen>=1){const v=d[0];$('cvFanPwm').textContent=v+'%';$('iFanPwm').value=v;} break;
       case CMD.LED_BRIGHT: if(flen>=1){const v=d[0];$('cvLed').textContent=v+'%';$('iLed').value=v;} break;
+      case CMD.FAN_MODE: if(flen>=1){const v=d[0];if(v===0||v===1){$('cvFanMode').textContent=v===1?'降温':'散热';$('iFanMode').value=String(v);}} break;
     }
     }catch(e){}
     o+=2+flen;
@@ -577,6 +628,7 @@ function parseConfigSingle(b){
     case CMD.SET_ASHUT: {const v=vU32();if(v!=null){$('cvAoff').textContent=v;$('iAoff').value=v;}} break;
     case CMD.FAN_PWM: {if(val.length>=1){const v=val[0];$('cvFanPwm').textContent=v+'%';$('iFanPwm').value=v;}} break;
     case CMD.LED_BRIGHT: {if(val.length>=1){const v=val[0];$('cvLed').textContent=v+'%';$('iLed').value=v;}} break;
+    case CMD.FAN_MODE: {if(val.length>=1){const v=val[0];if(v===0||v===1){$('cvFanMode').textContent=v===1?'降温':'散热';$('iFanMode').value=String(v);}}} break;
   }
 }
 function updateHeatBtn(){
@@ -708,10 +760,20 @@ $('btnSendPid').addEventListener('click',()=>{
   writeCmd(CMD.PID_KI,f32(rd('iKi')),'KI');
   writeCmd(CMD.PID_KD,f32(rd('iKd')),'KD');
 });
-$('btnSendOther').addEventListener('click',()=>{
+$('btnFanPwm').addEventListener('click',()=>{
   writeCmd(CMD.FAN_PWM,[Math.max(0,Math.min(100,rd('iFanPwm')))&0xFF],'风扇 PWM '+rd('iFanPwm')+'%');
+});
+$('btnLed').addEventListener('click',()=>{
   writeCmd(CMD.LED_BRIGHT,[Math.max(0,Math.min(100,rd('iLed')))&0xFF],'LED 亮度 '+rd('iLed')+'%');
+});
+$('btnFanMode').addEventListener('click',()=>{
+  const v=Math.max(0,Math.min(1,rd('iFanMode')))&0xFF;
+  writeCmd(CMD.FAN_MODE,[v],'风扇模式 '+(v===1?'降温':'散热'));
+});
+$('btnTcomp').addEventListener('click',()=>{
   writeCmd(CMD.SET_TCOMP,i16(rd('iTcomp')),'温补');
+});
+$('btnAoff').addEventListener('click',()=>{
   writeCmd(CMD.SET_ASHUT,u32(rd('iAoff')),'自动关机');
 });
 $('btnReset').addEventListener('click',()=>{
