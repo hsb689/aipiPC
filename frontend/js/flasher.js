@@ -124,6 +124,7 @@ export class BouffaloFlasher {
     // 1. bootinfo
     const bootinfo = await this.boot.getBootInfo();
     if (!bootinfo) throw new Error('读取 bootinfo 失败');
+    this.chipId = this.boot.chipId || null;
     if (bootinfo.length >= 4 &&
         bootinfo[0] === 0xff && bootinfo[1] === 0xff &&
         bootinfo[2] === 0xff && bootinfo[3] === 0xff) {
@@ -176,7 +177,7 @@ export class BouffaloFlasher {
     await this.boot.setFlashTimeout(2000);
 
     this._inited = true;
-    this._info = { bootinfo, jid };
+    this._info = { bootinfo, jid, chipId: this.chipId || null };
     return this._info;
   }
 

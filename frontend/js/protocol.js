@@ -243,6 +243,13 @@ export class BootromProtocol {
     if (this.chiptype === 'bl616' || this.chiptype === 'bl618') {
       this.bl616A0 = data.length > 0 && data[0] === 0x01;
       this.link.log('info', 'BL616/618 版本: ' + (this.bl616A0 ? 'A0' : 'A1+'));
+      // 芯片ID: bootinfo 字节12~17 逆序拼接 (与官方 bflb_iot_tool 解析一致)
+      if (data.length >= 18) {
+        const h = hex(data);
+        this.chipId = (h.slice(34, 36) + h.slice(32, 34) + h.slice(30, 32) +
+                       h.slice(28, 30) + h.slice(26, 28) + h.slice(24, 26)).toUpperCase();
+        this.link.log('ok', '芯片ID (ChipID): ' + this.chipId);
+      }
     }
     this.link.log('info', 'bootinfo: ' + hex(data));
     return data;
