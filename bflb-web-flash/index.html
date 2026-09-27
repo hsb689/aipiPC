@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bouffalo Web Flash · 博流串口下载工具</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">BL</span>
+      <div class="brand-txt">
+        <h1>Bouffalo Web Flash</h1>
+        <p>BL602 / BL616 / BL618 串口下载工具 · Web Serial API · 零后端</p>
+      </div>
+    </div>
+    <div id="env-warn" class="env-warn hidden"></div>
+  </header>
+
+  <main>
+    <!-- 1 设备 -->
+    <section class="card">
+      <h2><span class="step">1</span>设备</h2>
+
+      <div class="grid">
+        <label class="field">芯片型号
+          <select id="chip"></select>
+        </label>
+
+        <label class="field">波特率
+          <select id="baud">
+            <option value="2000000" selected>2000000</option>
+            <option value="1500000">1500000</option>
+            <option value="921600">921600</option>
+            <option value="500000">500000 (最稳)</option>
+            <option value="115200">115200</option>
+          </select>
+        </label>
+
+        <label class="field" id="loader-wrap">BL602 Loader
+          <select id="loader"></select>
+        </label>
+
+        <label class="field">复位电平
+          <select id="reset-mode">
+            <option value="normal" selected>常规 (USB-TTL, RTS 低有效)</option>
+            <option value="revert">取反 (博流专用下载器)</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="row">
+        <button id="btn-connect" class="btn primary">连接串口</button>
+        <button id="btn-detect" class="btn" disabled>检测芯片信息</button>
+        <button id="btn-scan" class="btn" disabled>扫描波特率</button>
+        <button id="btn-disconnect" class="btn ghost" disabled>断开</button>
+        <span id="port-label" class="port-label">未连接</span>
+      </div>
+
+      <p class="hint">
+        波特率 = <b>工作波特率</b>(烧录速率)。BL616/618 已按官方 bflb_iot_tool 两段式流程实现:
+        先以 <b>500000</b>(官方 speed_uart_boot) 与 bootrom 握手读 bootinfo, 再通过 clk_set(0x22)
+        升频到工作波特率高速烧录 —— 2M 握手不可靠(bootrom 内部 RC 时钟)正是部分 CH340K
+        场景"检测不到芯片"的原因。升频失败时, 可把波特率改成 500000 全程低速烧录。
+      </p>
+    </section>
+
+    <!-- 2 固件 -->
+    <section class="card">
+      <h2><span class="step">2</span>固件与地址</h2>
+
+      <div class="thead">
+        <span>固件文件 (.bin)</span>
+        <span>起始地址</span>
+        <span></span>
+      </div>
+      <div id="filelist"></div>
+      <button id="btn-add-file" class="btn small">＋ 添加文件</button>
+
+      <div class="options">
+        <label class="chk"><input type="checkbox" id="opt-noreset"> 不复位直接握手 (芯片已手动进 bootrom)</label>
+        <label class="chk"><input type="checkbox" id="opt-erase" checked> 烧录前擦除</label>
+        <label class="chk"><input type="checkbox" id="opt-verify" checked> 写入校验 (write_check)</label>
+        <label class="chk"><input type="checkbox" id="opt-sha"> SHA256 回读校验 (更强)</label>
+        <label class="chk"><input type="checkbox" id="opt-verbose"> 详细日志</label>
+      </div>
+
+      <div class="row">
+        <button id="btn-flash" class="btn primary" disabled>开始烧录</button>
+        <span class="hint inline">多文件会按列表顺序依次烧录，最后统一复位。</span>
+      </div>
+
+      <div class="progress-wrap">
+        <div class="progress"><div id="bar" class="bar"></div></div>
+        <div class="progress-meta">
+          <span id="pct">0%</span>
+          <span id="speed"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3 日志 -->
+    <section class="card">
+      <h2><span class="step">3</span>日志
+        <button id="btn-clear" class="btn tiny right">清空</button>
+      </h2>
+      <pre id="log" class="log"></pre>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span>协议逆向自 bflb_iot_tool 1.10.0 (MIT) · 移植自 bouffalo_flash.py</span>
+  </footer>
+</div>
+
+<script type="module" src="js/ui.js"></script>
+</body>
+</html>

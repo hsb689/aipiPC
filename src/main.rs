@@ -278,11 +278,29 @@ async fn ble_is_connected(state: tauri::State<'_, SharedBle>) -> Result<bool, St
     Ok(s.connected)
 }
 
+// 用系统默认浏览器打开外部链接(更新页等)。
+// 未安装 shell/opener 插件, window.open 与 <a target=_blank> 在 Tauri v2 中被静默拦截,
+// 所以前端无法自行打开, 必须走这条命令。
+#[tauri::command]
+fn open_external(url: String) -> Result<(), String> {
+    if !(url.starts_with("https://") || url.starts_with("http://")) {
+        return Err("only http(s) URLs are allowed".into());
+    }
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("rundll32")
+            .args(["url.dll,FileProtocolHandler", &url])
+            .spawn()
+            .map_err(|e| format!("open failed: {e}"))?;
+    }
+    Ok(())
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(SharedBle::default())
         .invoke_handler(tauri::generate_handler![
-            ble_scan, ble_connect, ble_disconnect, ble_write, ble_is_connected
+            ble_scan, ble_connect, ble_disconnect, ble_write, ble_is_connected, open_external
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

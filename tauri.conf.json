@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "AiPi Heater Upper",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "identifier": "com.aipi.heater-upper",
   "build": {
     "frontendDist": "./frontend"
@@ -17,7 +17,7 @@
         "minHeight": 700,
         "resizable": true,
         "url": "index.html",
-        "additionalBrowserArgs": "--enable-features=WebBluetooth"
+        "additionalBrowserArgs": "--enable-features=WebBluetooth,WebSerial"
       }
     ],
     "security": {

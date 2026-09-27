@@ -54,6 +54,7 @@ body {
   background: var(--bg3); color: var(--fg2);
 }
 .theme-sel {
+  -webkit-app-region:no-drag;
   -webkit-appearance:none; appearance:none;
   padding:4px 26px 4px 12px; border-radius:16px;
   font-size:clamp(10px,0.9vw,13px); font-family:inherit;
@@ -71,8 +72,8 @@ body {
 .switch-knob { position:absolute; left:2px; top:2px; width:18px; height:18px; background:#fff; border-radius:50%; transition:transform .2s; box-shadow:0 1px 3px rgba(0,0,0,0.3); }
 .switch input:checked + .switch-track { background:var(--accent); }
 .switch input:checked + .switch-track .switch-knob { transform:translateX(18px); }
-#scanOverlay { position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:1000; display:none; align-items:center; justify-content:center; }
-#scanModal { background:var(--card); border:1px solid var(--border); border-radius:16px; width:320px; max-width:90vw; box-shadow:0 8px 32px rgba(0,0,0,0.4); overflow:hidden; }
+#scanOverlay, #fwScanOverlay { position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:1000; display:none; align-items:center; justify-content:center; }
+#scanModal, #fwScanModal { background:var(--card); border:1px solid var(--border); border-radius:16px; width:340px; max-width:90vw; box-shadow:0 8px 32px rgba(0,0,0,0.4); overflow:hidden; }
 .scan-item { display:flex; align-items:center; gap:10px; padding:10px 14px; margin:4px 6px; border-radius:10px; cursor:pointer; transition:background .15s; }
 .scan-item:hover { background:var(--bg3); }
 .scan-num { width:28px; height:28px; border-radius:8px; background:var(--bg3); display:flex; align-items:center; justify-content:center; font-size:14px; }
@@ -222,8 +223,8 @@ body {
 .log-write { color: #0a84ff !important; }
 .log-info { color: #8fd694 !important; }
 .tgl-row{display:flex!important;align-items:center;justify-content:space-between!important;gap:12px;width:100%;box-sizing:border-box;}
-#updBadge{display:inline-block!important;font-size:15px!important;font-weight:600!important;padding:4px 14px!important;border-radius:14px!important;vertical-align:middle!important;background:#e8e8ed!important;color:#6e6e73!important;border:1px solid #d1d1d6!important;}
-#updBadge.upd-new{background:#ffd9d6!important;color:#c9302c!important;border:1px solid #ffb3ae!important;}
+#updBadge{display:inline-block!important;font-size:15px!important;font-weight:600!important;padding:4px 14px!important;border-radius:14px!important;vertical-align:middle!important;background:#e8e8ed!important;color:#6e6e73!important;border:1px solid #d1d1d6!important;-webkit-app-region:no-drag!important;cursor:default!important;}
+#updBadge.upd-new{background:#ffd9d6!important;color:#c9302c!important;border:1px solid #ffb3ae!important;cursor:pointer!important;}
 /* 右下角提醒卡片 */
 #toastStack{position:fixed;right:14px;bottom:14px;z-index:3000;display:flex;flex-direction:column;gap:8px;align-items:flex-end;pointer-events:none;}
 .toast{min-width:210px;max-width:300px;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,0.22);padding:9px 12px 11px;pointer-events:auto;position:relative;overflow:hidden;transform:translateX(calc(100% + 24px));transition:transform .28s ease,opacity .28s ease;}
@@ -241,13 +242,73 @@ body {
 .toast.warn .toast-bar{background:var(--red);}
 /* 回流焊阶段卡片高亮 */
 .temp-card.phase-active{border-color:var(--accent);background:var(--accent-bg);}
+/* ===== 固件更新页 (Bouffalo 下载器) ===== */
+#pageFw { overflow-y:auto; }
+.fw-card { margin-bottom:12px; }
+.fw-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-bottom:10px; }
+.fw-field { display:grid; gap:4px; font-size:11px; color:var(--fg2); font-weight:500; }
+#pageFw select {
+  width:100%; padding:6px 8px; border-radius:6px; font-size:13px;
+  border:1px solid var(--border); background:var(--bg); color:var(--fg);
+  font-family:inherit; outline:none;
+}
+#pageFw select:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-bg); }
+#pageFw select option { background:var(--card); color:var(--fg); }
+.fw-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px; }
+.fw-port { font-size:12px; color:var(--fg2); }
+.fw-port.on { color:var(--green); font-weight:600; }
+.fw-thead { display:grid; grid-template-columns:1fr 130px 30px; gap:8px; font-size:11px; color:var(--fg2); font-weight:600; margin-bottom:6px; }
+#pageFw .filerow { display:grid; grid-template-columns:1fr 130px 30px; gap:8px; margin-bottom:6px; align-items:center; }
+#pageFw .filerow input[type=file] { font-size:11px; color:var(--fg2); }
+#pageFw .addr {
+  width:100%; padding:6px 8px; border-radius:6px; font-size:12px;
+  border:1px solid var(--border); background:var(--bg); color:var(--fg);
+  font-family:inherit; outline:none;
+}
+#pageFw .addr:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-bg); }
+#pageFw .rm { border:1px solid var(--border); background:var(--bg3); color:var(--fg2); border-radius:6px; cursor:pointer; height:28px; font-family:inherit; }
+.fw-options { display:flex; flex-wrap:wrap; gap:8px 16px; margin-top:10px; font-size:12px; color:var(--fg2); }
+.fw-chk { display:inline-flex; align-items:center; gap:5px; cursor:pointer; }
+.fw-progress { margin-top:10px; }
+.fw-bar { height:8px; border-radius:4px; background:var(--bg3); overflow:hidden; }
+.fw-bar-fill { height:100%; width:0%; background:var(--green); transition:width .2s; border-radius:4px; }
+.fw-progress-meta { display:flex; justify-content:space-between; font-size:11px; color:var(--fg2); margin-top:4px; }
+.fw-log {
+  background:var(--bg2); border:1px solid var(--border); border-radius:8px;
+  padding:8px; height:220px; overflow-y:auto;
+  font-family:"SF Mono",Menlo,Consolas,monospace; font-size:11px; line-height:1.6;
+}
+.fw-log .ln { white-space:pre-wrap; word-break:break-all; }
+.fw-log .ok { color:var(--green); }
+.fw-log .err { color:var(--red); }
+.fw-log .warn { color:var(--orange); }
+.fw-log .info { color:var(--fg2); }
+.fw-log .dbg { color:var(--fg3); }
+/* 页面切换按钮: 与标题栏状态胶囊同款低对比度胶囊样式 */
+.page-btn {
+  border:1px solid transparent; background:var(--bg3); color:var(--fg2);
+  padding:4px 12px; border-radius:16px; font-size:clamp(10px,0.9vw,13px);
+  cursor:pointer; font-family:inherit; -webkit-app-region:no-drag;
+  transition:border-color .15s, color .15s;
+}
+.page-btn:hover { border-color:var(--border); color:var(--fg); }
+.hidden-btn { display:none !important; }
+.hidden-page { display:none !important; }
+/* 固件页布局: 与主页面一致平铺, 设备+固件双栏, 日志整行 */
+#pageFw .fw-layout { display:grid; grid-template-columns:minmax(0,2fr) minmax(0,3fr); gap:12px; align-items:start; }
+#pageFw .fw-full { grid-column:1 / -1; }
+.fw-card { margin-bottom:0; }
+#pageFw .fw-log { height:260px; }
+@media (max-width:1100px){ #pageFw .fw-layout { grid-template-columns:1fr; } }
 </style>
 </head>
 <body>
 <div class="header">
-  <span id="updBadge">V0.4</span>
+  <span id="updBadge">V0.5</span>
   <div style="display:flex;align-items:center;gap:10px;">
-    <div class="status-pill"><span class="status-dot" id="dot"></span><span id="connText">未连接</span></div>
+    <div class="status-pill" id="blePill"><span class="status-dot" id="dot"></span><span id="connText">未连接</span></div>
+    <button class="page-btn" id="btnPageFw">固件更新</button>
+    <button class="page-btn hidden-btn" id="btnPageMain">返回主页</button>
     <select id="themeSel" class="theme-sel">
       <option value="auto">🖥 跟随系统</option>
       <option value="light">☀ 浅色</option>
@@ -256,7 +317,7 @@ body {
     <button class="btn btn-primary" id="btnConn">连接设备</button>
   </div>
 </div>
-<div class="main">
+<div class="main" id="pageMain">
   <div class="col col-left">
     <div class="card">
       <div class="chip"><span class="chip-label">输入电压</span><span class="chip-val" id="vIn">-- V</span></div>
@@ -429,6 +490,68 @@ body {
     </div>
   </div>
 </div>
+<div class="main hidden-page" id="pageFw">
+  <div class="col">
+    <div class="fw-layout">
+      <div class="card fw-card">
+        <div class="card-title">固件下载 · BL616 / BL618 (Web Serial)</div>
+        <div class="fw-grid">
+          <label class="fw-field">芯片型号
+            <select id="fwChip"></select>
+          </label>
+          <label class="fw-field">波特率 (工作/烧录速率)
+            <select id="fwBaud">
+              <option value="2000000" selected>2000000</option>
+              <option value="1500000">1500000</option>
+              <option value="921600">921600</option>
+              <option value="500000">500000 (最稳)</option>
+              <option value="115200">115200</option>
+            </select>
+          </label>
+          <label class="fw-field">复位电平
+            <select id="fwResetMode">
+              <option value="normal" selected>常规 (USB-TTL, RTS 低有效)</option>
+              <option value="revert">取反 (博流专用下载器)</option>
+            </select>
+          </label>
+        </div>
+        <div class="fw-row">
+          <button id="fwBtnConnect" class="btn btn-primary">连接串口</button>
+          <button id="fwBtnDetect" class="btn btn-ghost" disabled>检测芯片信息</button>
+          <button id="fwBtnScan" class="btn btn-ghost" disabled>扫描波特率</button>
+          <button id="fwBtnDisconnect" class="btn btn-ghost" disabled>断开</button>
+          <span id="fwPortLabel" class="fw-port">未连接</span>
+        </div>
+      </div>
+      <div class="card fw-card">
+        <div class="card-title">固件与地址</div>
+        <div class="fw-thead"><span>固件文件 (.bin)</span><span>起始地址</span><span></span></div>
+        <div id="fwFileList"></div>
+        <button id="fwBtnAddFile" class="btn btn-ghost" style="margin-top:8px;">＋ 添加文件</button>
+        <div class="fw-options">
+          <label class="fw-chk"><input type="checkbox" id="fwOptNoReset"> 不复位直接握手 (已手动进 bootrom)</label>
+          <label class="fw-chk"><input type="checkbox" id="fwOptErase" checked> 烧录前擦除</label>
+          <label class="fw-chk"><input type="checkbox" id="fwOptVerify" checked> 写入校验 (write_check)</label>
+          <label class="fw-chk"><input type="checkbox" id="fwOptSha"> SHA256 回读校验</label>
+          <label class="fw-chk"><input type="checkbox" id="fwOptVerbose"> 详细日志</label>
+        </div>
+        <div class="fw-row">
+          <button id="fwBtnFlash" class="btn btn-primary" disabled>开始烧录</button>
+        </div>
+        <div class="fw-progress">
+          <div class="fw-bar"><div id="fwBar" class="fw-bar-fill"></div></div>
+          <div class="fw-progress-meta"><span id="fwPct">0%</span><span id="fwSpeed"></span></div>
+        </div>
+      </div>
+      <div class="card fw-card fw-full">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">下载日志
+          <button id="fwBtnClear" class="btn btn-ghost" style="padding:2px 8px;font-size:11px;">清空</button>
+        </div>
+        <div id="fwLog" class="fw-log"></div>
+      </div>
+    </div>
+  </div>
+</div>
 <div id="toastStack"></div>
 <script>
 const $=id=>document.getElementById(id);
@@ -457,22 +580,31 @@ document.addEventListener('keydown',e=>{
 
 
 // ---- Check for updates (GitHub Releases) ----
-const APP_VERSION='V0.4';
+const APP_VERSION='V0.5';
 const UPDATE_URL='https://github.com/hsb689/aipiPC/releases/latest';
-function setUpdBadge(state){
+function setUpdBadge(state, tag){
   const el=document.getElementById('updBadge'); if(!el) return;
   // 必须用 class 切换: #updBadge 的背景/文字/边框是 !important 规则,
   // 内联样式(el.style.*)无法覆盖, 之前"new"状态因此永远显示不出来
   if(state==='new'){
     el.classList.add('upd-new');
-    el.title='有新版本，点击前往 GitHub 下载';
-    el.onclick=()=>{ try{ window.__TAURI__.shell.open(UPDATE_URL); }catch(e){ window.open(UPDATE_URL,'_blank'); } };
+    el.title='发现新版本 '+(tag||'')+'，点击前往 GitHub 下载';
+    el.onclick=openUpdatePage;
   }else{
     el.classList.remove('upd-new');
     el.title='';
     el.onclick=null;
   }
   el.style.display='inline-block';
+}
+// 经由 Rust 命令用系统默认浏览器打开: 未装 shell/opener 插件时
+// window.open 与 <a target=_blank> 会被 Tauri v2 静默拦截
+function openUpdatePage(){
+  invoke('open_external',{url:UPDATE_URL})
+    .catch(e=>{
+      log('error','打开更新页失败: '+e);
+      try{window.__TAURI__.shell.open(UPDATE_URL);}catch(e2){window.open(UPDATE_URL,'_blank');}
+    });
 }
 // 数值化比较版本号: "V0.3.0"与"V0.3"视为相同, "v0.4"/"V0.4.1">"V0.3" 触发提示
 function verNums(s){return (String(s).match(/\d+/g)||[]).map(Number);}
@@ -499,7 +631,10 @@ async function checkForUpdate(){
     if(!r.ok){ scheduleUpdRetry(120000); return; }
     const j=await r.json();
     const tag=String(j.tag_name||'').trim();
-    if(tag && isNewerVer(tag,APP_VERSION)){ setUpdBadge('new'); }
+    if(tag && isNewerVer(tag,APP_VERSION)){
+      setUpdBadge('new',tag);
+      toast('info','发现新版本 '+tag,'当前 '+APP_VERSION+'，点击前往 GitHub 下载',{dur:8000,click:openUpdatePage});
+    }
     else { setUpdBadge('ok'); }
   }catch(e){
     scheduleUpdRetry(120000); /* 离线/网络异常: 2分钟后重试 */
@@ -536,9 +671,11 @@ function toast(level,title,msg,opts={}){
   el.className='toast '+level;
   el.innerHTML='<div class="toast-title">'+title+'</div>'+(msg?'<div class="toast-msg">'+msg+'</div>':'')
     +'<div class="toast-bar" style="animation-duration:'+dur+'ms"></div>';
+  if(opts.click){el.style.cursor='pointer';el.onclick=()=>{try{opts.click();}catch(e){}dismiss();};}
+  const dismiss=()=>{el.classList.add('hide');setTimeout(()=>el.remove(),320);};
   stack.appendChild(el);
   requestAnimationFrame(()=>requestAnimationFrame(()=>el.classList.add('show')));
-  setTimeout(()=>{el.classList.add('hide');setTimeout(()=>el.remove(),320);},dur);
+  setTimeout(dismiss,dur);
 }
 
 let connected=false, heating=false, workMode=0, scanning=false, vpwmDuty=0, ipwmDuty=0;
@@ -886,6 +1023,24 @@ $('btnReset').addEventListener('click',()=>{
   writeCmd(CMD.LOAD_DEFAULT,[],'恢复出厂设置');
 });
 
+// 页面切换: 主页面 / 固件更新 (BLE 连接按钮仅主页面显示)
+// 用 !important 类切换显隐, 并在启动时强制同步一次, 避免任何初始双按钮态
+function showPage(p) {
+  const fw = (p === 'fw');
+  const pm = $('pageMain'), pf = $('pageFw');
+  if (!pm || !pf) return;
+  pm.classList.toggle('hidden-page', fw);
+  pf.classList.toggle('hidden-page', !fw);
+  $('btnPageFw').classList.toggle('hidden-btn', fw);
+  $('btnPageMain').classList.toggle('hidden-btn', !fw);
+  $('btnConn').classList.toggle('hidden-btn', fw);
+  const pill = $('blePill');
+  if (pill) pill.classList.toggle('hidden-btn', fw);
+}
+$('btnPageFw').addEventListener('click', () => showPage('fw'));
+$('btnPageMain').addEventListener('click', () => showPage('main'));
+showPage('main');
+
 // Tab switching
 document.querySelectorAll('.tab').forEach(tab=>{
   tab.addEventListener('click',()=>{
@@ -1148,6 +1303,296 @@ log('info','AiPi 加热台上位机就绪');
 updateModeUI();
 </script>
 
+<script type="module">
+// ===== 固件更新页: Bouffalo BL616/BL618 串口下载器 (Web Serial, 独立于主页面 BLE) =====
+import { BouffaloSerial, isSerialSupported } from './js/transport.js';
+import { CHIPS, BouffaloLink } from './js/protocol.js';
+import { BouffaloFlasher, FlashFile } from './js/flasher.js';
+import { parseAddr, humanSize, hex32 } from './js/util.js';
+
+const $ = (id) => document.getElementById(id);
+const fwChip = $('fwChip'), fwBaud = $('fwBaud'), fwResetMode = $('fwResetMode');
+const btnConnect = $('fwBtnConnect'), btnDetect = $('fwBtnDetect'), btnScan = $('fwBtnScan'),
+      btnDisconnect = $('fwBtnDisconnect'), btnFlash = $('fwBtnFlash'), btnAddFile = $('fwBtnAddFile'),
+      btnClear = $('fwBtnClear');
+const portLabel = $('fwPortLabel'), fileList = $('fwFileList'), bar = $('fwBar'),
+      pctEl = $('fwPct'), speedEl = $('fwSpeed');
+const optErase = $('fwOptErase'), optNoReset = $('fwOptNoReset'), optVerify = $('fwOptVerify'),
+      optSha = $('fwOptSha'), optVerbose = $('fwOptVerbose');
+
+const MAX_LINES = 3000;
+let verbose = false;
+
+function ts() {
+  const d = new Date();
+  const p = (n, w = 2) => String(n).padStart(w, '0');
+  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(), 3)}`;
+}
+function log(level, msg) {
+  if (level === 'dbg' && !verbose) return;
+  const el = $('fwLog');
+  if (!el) return;
+  const line = document.createElement('div');
+  line.className = 'ln ' + level;
+  line.textContent = `${ts()}  ${msg}`;
+  el.appendChild(line);
+  while (el.childElementCount > MAX_LINES) el.removeChild(el.firstChild);
+  el.scrollTop = el.scrollHeight;
+}
+
+const serial = new BouffaloSerial(log);
+let busy = false, connected = false;
+function setBusy(b) { busy = b; updateButtons(); }
+function updateButtons() {
+  btnConnect.disabled = busy || connected;
+  btnDisconnect.disabled = busy || !connected;
+  btnDetect.disabled = busy || !connected;
+  btnScan.disabled = busy || !connected;
+  btnFlash.disabled = busy || !connected;
+  btnAddFile.disabled = busy;
+  fwChip.disabled = busy || connected;
+  fwBaud.disabled = busy || connected;
+  fwResetMode.disabled = busy || connected;
+}
+function initSelects() {
+  for (const key of ['bl616', 'bl618']) {
+    const o = document.createElement('option');
+    o.value = key; o.textContent = CHIPS[key].label;
+    fwChip.appendChild(o);
+  }
+  fwChip.value = 'bl618';
+}
+function addFileRow() {
+  const row = document.createElement('div');
+  row.className = 'filerow';
+  const fi = document.createElement('input');
+  fi.type = 'file'; fi.accept = '.bin,application/octet-stream';
+  const addr = document.createElement('input');
+  addr.type = 'text'; addr.className = 'addr'; addr.value = '0x10000'; addr.spellcheck = false;
+  const rm = document.createElement('button');
+  rm.className = 'rm'; rm.textContent = '×'; rm.title = '移除';
+  rm.addEventListener('click', () => {
+    if (fileList.childElementCount <= 1) { fi.value = ''; addr.value = '0x10000'; return; }
+    row.remove();
+  });
+  fi.addEventListener('change', () => {
+    const f = fi.files && fi.files[0];
+    if (f) log('info', `选择文件: ${f.name} (${humanSize(f.size)})`);
+  });
+  row.append(fi, addr, rm);
+  fileList.appendChild(row);
+}
+function describePort(port) {
+  try {
+    const info = port.getInfo ? port.getInfo() : {};
+    if (info && (info.usbVendorId || info.usbProductId)) {
+      const h = (v) => v === undefined ? '????' : v.toString(16).padStart(4, '0');
+      return `已连接 (VID:${h(info.usbVendorId)} PID:${h(info.usbProductId)})`;
+    }
+  } catch (_) { /* ignore */ }
+  return '已连接';
+}
+function readCfg() {
+  return {
+    chip: fwChip.value,
+    baud: parseInt(fwBaud.value, 10),
+    resetRevert: fwResetMode.value === 'revert',
+    noReset: optNoReset.checked,
+    erase: optErase.checked,
+    verify: optVerify.checked,
+    sha: optSha.checked,
+  };
+}
+function makeFlasher(cfg) {
+  return new BouffaloFlasher({
+    serial, chip: cfg.chip, resetRevert: cfg.resetRevert,
+    noReset: cfg.noReset, workBaud: cfg.baud, log, verbose,
+  });
+}
+function resetProgress() { bar.style.width = '0%'; pctEl.textContent = '0%'; speedEl.textContent = ''; }
+function onProgress(cur, total, elapsedMs, suffix) {
+  const pct = total ? Math.floor((cur * 100) / total) : 100;
+  bar.style.width = pct + '%'; pctEl.textContent = pct + '%';
+  const kb = elapsedMs > 0 ? cur / (elapsedMs / 1000) / 1024 : 0;
+  speedEl.textContent = `${humanSize(cur)} / ${humanSize(total)}   ${kb.toFixed(0)} KB/s` + (suffix ? `   [${suffix}]` : '');
+}
+async function collectFiles() {
+  const rows = Array.from(fileList.querySelectorAll('.filerow'));
+  const files = [];
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const input = row.querySelector('input[type="file"]');
+    const addrIn = row.querySelector('input.addr');
+    const f = input.files && input.files[0];
+    if (!f) continue;
+    let addr;
+    try { addr = parseAddr(addrIn.value); }
+    catch (e) { throw new Error(`第 ${i + 1} 行地址非法: ${addrIn.value}`); }
+    const buf = await f.arrayBuffer();
+    files.push(new FlashFile(f.name, new Uint8Array(buf), addr));
+  }
+  return files;
+}
+
+// 自绘串口选择弹窗: 列出已授权端口直接点选; 新串口通过「添加新设备」走系统选择器
+const USB_NAMES = {
+  '1a86:7523': 'CH340 串口', '1a86:5523': 'CH341 串口',
+  '10c4:ea60': 'CP2102 串口', '0403:6001': 'FT232 串口',
+};
+function usbKey(info) {
+  if (!info || info.usbVendorId === undefined) return null;
+  return info.usbVendorId.toString(16) + ':' + (info.usbProductId || 0).toString(16);
+}
+function portDisplayName(port) {
+  try {
+    const info = port.getInfo ? port.getInfo() : {};
+    const key = usbKey(info);
+    if (!key) return '串口设备';
+    const name = USB_NAMES[key] || 'USB 串口设备';
+    return `${name}  (VID:${key.split(':')[0].toUpperCase()} PID:${key.split(':')[1].toUpperCase()})`;
+  } catch (e) { return '串口设备'; }
+}
+function openFwPortPicker() {
+  return new Promise(async (resolve) => {
+    const list = $('fwScanList');
+    const close = (val) => { $('fwScanOverlay').style.display = 'none'; resolve(val); };
+    list.innerHTML = '';
+    $('fwScanSpinner').textContent = '';
+    let ports = [];
+    try { ports = await navigator.serial.getPorts(); } catch (e) { /* ignore */ }
+    if (!ports.length) {
+      const d = document.createElement('div');
+      d.className = 'scan-item'; d.style.cursor = 'default';
+      d.innerHTML = '<span class="scan-num">ℹ</span><div style="flex:1;min-width:0;">' +
+        '<div class="scan-name">暂无已授权的串口设备</div>' +
+        '<div class="scan-id">点击下方「添加新设备…」选择</div></div>';
+      list.appendChild(d);
+    }
+    ports.forEach((p) => {
+      const item = document.createElement('div');
+      item.className = 'scan-item';
+      item.innerHTML = '<span class="scan-num">🔌</span><div style="flex:1;min-width:0;">' +
+        '<div class="scan-name">' + portDisplayName(p) + '</div>' +
+        '<div class="scan-id">点击连接</div></div>';
+      item.onclick = () => close(p);
+      list.appendChild(item);
+    });
+    const add = document.createElement('div');
+    add.className = 'scan-item';
+    add.innerHTML = '<span class="scan-num">➕</span><div style="flex:1;min-width:0;">' +
+      '<div class="scan-name">添加新设备…</div>' +
+      '<div class="scan-id">打开系统选择器 (新串口首次使用时需要)</div></div>';
+    add.onclick = async () => {
+      try {
+        const p = await navigator.serial.requestPort();
+        close(p);
+      } catch (e) { /* 用户取消, 留在弹窗内 */ }
+    };
+    list.appendChild(add);
+    $('fwScanCancel').onclick = () => close(null);
+    $('fwScanOverlay').style.display = 'flex';
+  });
+}
+btnConnect.addEventListener('click', async () => {
+  if (!isSerialSupported()) { log('err', '当前 WebView 不支持 Web Serial API'); return; }
+  setBusy(true);
+  try {
+    const baud = parseInt(fwBaud.value, 10);
+    const port = await openFwPortPicker();
+    if (!port) { log('info', '已取消选择串口'); return; }
+    serial.useGrantedPort(port);
+    await serial.open(baud);
+    connected = true;
+    portLabel.textContent = describePort(serial.port);
+    portLabel.classList.add('on');
+    log('ok', `串口已打开, 波特率 ${baud} bps`);
+  } catch (e) {
+    log('err', '打开串口失败: ' + (e && e.message ? e.message : e));
+    try { await serial.close(); } catch (_) { /* ignore */ }
+    connected = false;
+    portLabel.textContent = '未连接';
+    portLabel.classList.remove('on');
+  } finally { setBusy(false); updateButtons(); }
+});
+btnDisconnect.addEventListener('click', async () => {
+  setBusy(true);
+  try { await serial.close(); log('info', '串口已关闭'); }
+  catch (e) { log('warn', '关闭串口时出错: ' + (e && e.message ? e.message : e)); }
+  finally {
+    connected = false;
+    portLabel.textContent = '未连接';
+    portLabel.classList.remove('on');
+    setBusy(false); updateButtons();
+  }
+});
+btnDetect.addEventListener('click', async () => {
+  if (!connected) { log('warn', '请先连接串口'); return; }
+  const cfg = readCfg();
+  setBusy(true); resetProgress();
+  try {
+    const flasher = makeFlasher(cfg);
+    const { bootinfo, jid } = await flasher.init();
+    log('ok', `检测完成: bootinfo=${bootinfo ? bootinfo.length : 0} 字节` +
+      (jid && jid.length ? `, JID=${Array.from(jid, (b) => b.toString(16).padStart(2, '0')).join('')}` : ''));
+  } catch (e) { log('err', '检测失败: ' + (e && e.message ? e.message : e)); }
+  finally { setBusy(false); }
+});
+const SCAN_BAUDS = [500000, 921600, 2000000, 1500000, 115200];
+btnScan.addEventListener('click', async () => {
+  if (!connected) { log('warn', '请先连接串口'); return; }
+  setBusy(true);
+  const revert = fwResetMode.value === 'revert';
+  try {
+    let found = 0;
+    for (const b of SCAN_BAUDS) {
+      log('info', '尝试 ' + b + ' bps (先复位进 bootrom 再握手) ...');
+      try { await serial.reopen(b); }
+      catch (e) { log('err', '切换到 ' + b + ' 失败: ' + (e && e.message ? e.message : e)); continue; }
+      const link = new BouffaloLink(serial, fwChip.value, { log, dbg: () => {} });
+      if (await link.resetToBootrom({ doReset: true, resetRevert: revert, retry: 1 })) {
+        found = b; fwBaud.value = String(b);
+        log('ok', '握手成功! 波特率 = ' + b + ' (已自动选中), 直接点「检测芯片信息」即可');
+        break;
+      }
+      log('warn', b + ' 无应答');
+    }
+    if (!found) log('err', '所有波特率都握手失败。检查: TX/RX 是否接反 / 共地 / 复位电平是否选对');
+  } finally { setBusy(false); updateButtons(); }
+});
+btnFlash.addEventListener('click', async () => {
+  if (!connected) { log('warn', '请先连接串口'); return; }
+  const cfg = readCfg();
+  let files;
+  try { files = await collectFiles(); }
+  catch (e) { log('err', e.message); return; }
+  if (!files.length) { log('warn', '请先选择至少一个固件文件'); return; }
+  log('info', `准备烧录 ${files.length} 个文件:`);
+  for (const f of files) log('info', `    ${hex32(f.addr)}  ${f.name}  (${f.data.length} 字节)`);
+  setBusy(true); resetProgress();
+  const t0 = performance.now();
+  try {
+    const flasher = makeFlasher(cfg);
+    await flasher.flash(files, { erase: cfg.erase, verify: cfg.verify, shaVerify: cfg.sha, onProgress });
+    bar.style.width = '100%'; pctEl.textContent = '100%';
+    log('ok', `全部完成, 总耗时 ${((performance.now() - t0) / 1000).toFixed(2)}s`);
+  } catch (e) {
+    log('err', '烧录失败: ' + (e && e.message ? e.message : e));
+    if (e && e.stack && verbose) log('dbg', e.stack);
+  } finally { setBusy(false); }
+});
+btnAddFile.addEventListener('click', addFileRow);
+btnClear.addEventListener('click', () => { const el = $('fwLog'); if (el) el.textContent = ''; });
+optVerbose.addEventListener('change', () => { verbose = optVerbose.checked; log('info', '详细日志: ' + (verbose ? '开' : '关')); });
+window.addEventListener('beforeunload', () => { try { if (serial.isOpen) serial.close(); } catch (_) { /* ignore */ } });
+
+(function boot() {
+  initSelects(); addFileRow();
+  if (!isSerialSupported()) log('err', '当前 WebView 不支持 Web Serial API, 固件下载页不可用');
+  else log('info', '固件下载器就绪 (BL616/BL618)');
+  updateButtons();
+})();
+</script>
+
 <div id="scanOverlay">
   <div id="scanModal">
     <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
@@ -1157,6 +1602,20 @@ updateModeUI();
     <div id="scanList" style="max-height:300px;overflow-y:auto;padding:4px 0;"></div>
     <div style="padding:10px 14px;border-top:1px solid var(--border);text-align:right;">
       <button class="btn btn-ghost" id="scanCancelBtn">取消</button>
+    </div>
+  </div>
+</div>
+
+<div id="fwScanOverlay">
+  <div id="fwScanModal">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+      <span style="font-size:15px;font-weight:600;">选择串口设备</span>
+      <span id="fwScanSpinner" style="font-size:12px;color:var(--fg2);"></span>
+    </div>
+    <div id="fwScanList" style="max-height:300px;overflow-y:auto;padding:4px 0;"></div>
+    <div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;justify-content:space-between;">
+      <button class="btn btn-ghost" id="fwScanAdd" style="font-size:12px;">＋ 添加新设备…</button>
+      <button class="btn btn-ghost" id="fwScanCancel">取消</button>
     </div>
   </div>
 </div>
