@@ -327,7 +327,7 @@ body {
 <body>
 <div class="header">
   <div style="display:flex;align-items:center;gap:10px;">
-    <span id="updBadge">V0.5</span>
+    <span id="updBadge">V0.5.1</span>
     <button class="page-btn" id="btnAbout">关于</button>
   </div>
   <div style="display:flex;align-items:center;gap:10px;">
@@ -632,7 +632,7 @@ document.addEventListener('keydown',e=>{
 
 
 // ---- Check for updates (GitHub Releases) ----
-const APP_VERSION='V0.5';
+const APP_VERSION='V0.5.1';
 const UPDATE_URL='https://github.com/hsb689/aipiPC/releases/latest';
 function setUpdBadge(state, tag){
   const el=document.getElementById('updBadge'); if(!el) return;
@@ -881,6 +881,8 @@ function parseConfigSingle(b){
 
 /* ===== 回流焊阶段跟踪: 阶段卡片高亮 + 进入阶段提醒 ===== */
 let reflowSeconds=0, reflowPhase='';
+let reflowPhaseCandidate='', reflowPhaseCandidateSince=0;
+let reflowPhaseSynced=false;   // 连接后首次阶段同步: 文案用"当前处于X段"而非"进入X段"
 const PHASE_DEFS={preheat:['预热','rfPhase1'],keep:['恒温','rfPhase2'],reflow:['回流','rfPhase3'],cool:['冷却','rfPhase4']};
 function getReflowPhase(){
   if(workMode!==1||!heating)return '';
@@ -892,27 +894,67 @@ function getReflowPhase(){
 }
 function updateReflowPhase(){
   const ph=getReflowPhase();
+  // 卡片高亮跟随"已确认"阶段
   for(const k in PHASE_DEFS){
-    const el=$(PHASE_DEFS[k][1]); if(el)el.classList.toggle('phase-active',k===ph);
+    const el=$(PHASE_DEFS[k][1]); if(el)el.classList.toggle('phase-active',k===reflowPhase);
   }
-  if(ph&&ph!==reflowPhase){
-    const name=PHASE_DEFS[ph][0];
-    const info={preheat:rd('iRfPT')+'℃ / '+rd('iRfPTT')+'s',keep:rd('iRfKT')+'℃ / '+rd('iRfKTT')+'s',
-      reflow:rd('iRfRT')+'℃ / '+rd('iRfRTT')+'s',cool:'停热回落至常温'}[ph];
-    toast('info','回流焊进入'+name+'段',info,{key:'phase-'+ph,cooldown:8000});
+  if(ph===reflowPhase){
+    reflowPhaseCandidate='';
+  }else if(ph===reflowPhaseCandidate){
+    // 新阶段需连续稳定 1.5s 才确认: 阶段边界上秒数/加热标志抖动产生的
+    // preheat<->keep 交替永远凑不满稳定窗口, 不再成对误弹卡片
+    if(ph&&Date.now()-reflowPhaseCandidateSince>=1500){
+      reflowPhase=ph; reflowPhaseCandidate='';
+      const name=PHASE_DEFS[ph][0];
+      const first=!reflowPhaseSynced;
+      reflowPhaseSynced=true;
+      const info={preheat:rd('iRfPT')+'℃ / '+rd('iRfPTT')+'s',keep:rd('iRfKT')+'℃ / '+rd('iRfKTT')+'s',
+        reflow:rd('iRfRT')+'℃ / '+rd('iRfRTT')+'s',cool:'停热回落至常温'}[ph];
+      toast('info',(first?'当前处于':'回流焊进入')+name+'段',info,{key:'phase-'+ph+(first?'-sync':''),cooldown:8000});
+    }
+  }else{
+    reflowPhaseCandidate=ph; reflowPhaseCandidateSince=Date.now();
   }
-  reflowPhase=ph;
 }
 
 /* ===== 温度相关告警 ===== */
 let heatWatch={maxTemp:null,lastRise:0};
+// 当前生效的目标温度: 回流焊模式取当前阶段的目标温度, 恒温模式取设定温度
+// (回流焊用恒温设定温度当目标会导致"超温"误报)
+function currentTargetTemp(){
+  if(workMode===1&&heating){
+    const ph=getReflowPhase();
+    if(ph==='preheat')return rd('iRfPT')||0;
+    if(ph==='keep')return rd('iRfKT')||0;
+    if(ph==='reflow')return rd('iRfRT')||0;
+    return 0; // 冷却阶段无目标
+  }
+  return parseFloat($('setTemp').textContent)||0;
+}
 function checkTempWarnings(v){
   const now=Date.now();
   // 温度探头异常: 协议约定 >500℃ 为异常值
   if(v>500){toast('warn','温度探头异常','上报温度 '+v+'℃ 超出量程, 请检查温度探头',{key:'sensor',cooldown:20000});return;}
-  const target=parseFloat($('setTemp').textContent)||0;
-  // 温度超过目标 10℃ 以上
-  if(target>0&&v>target+10){toast('warn','温度超目标','当前 '+v+'℃, 已超过目标 '+target+'℃ 十度以上',{key:'overtemp',cooldown:15000});}
+  const target=currentTargetTemp();
+  if(workMode===1){
+    // 回流焊模式: 通用"温度超目标"提醒彻底禁用 (恒温设定温度在这里没有意义)。
+    // 改为按阶段单独判断: 当前阶段目标+20℃ 才弹窗, 且对已走过的阶段目标取最大值
+    // (阶段模型与设备实际推进可能不同步, 如预热85℃/恒温65℃时, 恒温段阈值取85而非65)
+    if(heating){
+      const ph=getReflowPhase();
+      if(ph&&ph!=='cool'){
+        let phTarget=target;
+        if(ph==='keep')phTarget=Math.max(phTarget,rd('iRfPT')||0);
+        else if(ph==='reflow')phTarget=Math.max(phTarget,rd('iRfKT')||0,rd('iRfPT')||0);
+        const name=PHASE_DEFS[ph][0];
+        if(phTarget>0&&v>phTarget+20){
+          toast('warn','回流焊'+name+'段超温','当前 '+v+'℃, '+name+'段目标 '+phTarget+'℃, 已超出 20℃ 以上',{key:'overtemp-'+ph,cooldown:15000});
+        }
+      }
+    }
+  }else if(target>0&&v>target+10){
+    toast('warn','温度超目标','当前 '+v+'℃, 已超过目标 '+target+'℃ 十度以上',{key:'overtemp',cooldown:15000});
+  }
   // 加热中但温度长时间(6s)未上升, 且明显低于目标: 加热器可能故障
   if(heating){
     if(heatWatch.maxTemp==null||v>heatWatch.maxTemp+0.4){heatWatch.maxTemp=v;heatWatch.lastRise=now;}
@@ -978,6 +1020,7 @@ function setConnUI(isOn, name){
 async function connectDevice(deviceId){
   const name=await invoke('ble_connect',{deviceId});
   connected=true; wantConnected=true; heating=false;
+  reflowPhaseSynced=false;   // 本次会话尚未同步过阶段: 首个确认阶段用"当前处于"文案
   setConnUI(true,name);
   lastDeviceId=deviceId; lastDeviceName=name;
   return name;
@@ -1015,6 +1058,7 @@ listen('ble-disconnected', async () => {
   connected=false; heating=false;
   setConnUI(false);
   updateHeatBtn();
+  reflowPhase=''; reflowPhaseSynced=false; updateReflowPhase();   // 清除阶段高亮
   if (wantConnected && lastDeviceId) {
     // 非手动断开(设备关机/离开范围): 自动重连
     log('error','设备已断开连接',CONN_STICKY);
@@ -1028,6 +1072,7 @@ $('btnConn').addEventListener('click', async()=>{
     try{await invoke('ble_disconnect');}catch(e){}
     connected=false; heating=false;
     setConnUI(false);
+    reflowPhase=''; reflowPhaseSynced=false; updateReflowPhase();   // 清除阶段高亮
     log('disconnect','已断开',CONN_STICKY);
     toast('info','已断开连接');
     return;
@@ -1039,14 +1084,14 @@ $('btnConn').addEventListener('click', async()=>{
     // advertising, so retry the scan a few times before giving up.
     let devs=[];
     let chosen=null;
-    for(let i=0;i<4;i++){
+    for(let i=0;i<6;i++){
       devs=await invoke('ble_scan');
       if(devs&&devs.length>0){
         // 设备广播名固定为 AiPi-Heatbed: 扫到即直连 (名称比较忽略大小写)
         chosen=devs.find(d=>(d.name||'').trim().toLowerCase()==='aipi-heatbed');
         if(chosen)break;
       }
-      if(i<3)await new Promise(r=>setTimeout(r,1500));
+      if(i<5)await new Promise(r=>setTimeout(r,1500));
     }
     if(!chosen){
       if(!devs||devs.length===0){
