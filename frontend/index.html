@@ -72,12 +72,21 @@ body {
 .switch-knob { position:absolute; left:2px; top:2px; width:18px; height:18px; background:#fff; border-radius:50%; transition:transform .2s; box-shadow:0 1px 3px rgba(0,0,0,0.3); }
 .switch input:checked + .switch-track { background:var(--accent); }
 .switch input:checked + .switch-track .switch-knob { transform:translateX(18px); }
-#scanOverlay, #fwScanOverlay, #aboutOverlay { position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:1000; display:none; align-items:center; justify-content:center; }
+#scanOverlay, #fwScanOverlay, #aboutOverlay, #cfmOverlay { position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:1000; display:none; align-items:center; justify-content:center; }
 #scanModal, #fwScanModal, #aboutModal { background:var(--card); border:1px solid var(--border); border-radius:16px; width:340px; max-width:90vw; box-shadow:0 8px 32px rgba(0,0,0,0.4); overflow:hidden; }
+#cfmOverlay { z-index:2500; }
+#cfmModal { background:var(--card); border:1px solid var(--border); border-radius:16px; width:320px; max-width:90vw; box-shadow:0 8px 32px rgba(0,0,0,0.4); overflow:hidden; }
+.modal-head { padding:16px 20px 4px; font-size:16px; font-weight:700; color:var(--fg); }
+.modal-body { padding:6px 20px 14px; font-size:14px; color:var(--fg2); line-height:1.6; }
+.modal-foot { display:flex; gap:10px; padding:14px 20px 16px; }
+.modal-foot .btn { flex:1; }
+/* 确认弹窗按钮配色 */
+.btn.btn-danger { background:var(--red); border-color:var(--red); color:#fff; }
 #aboutOverlay { z-index:1200; }
 #aboutModal { width:340px; text-align:left; }
-#aboutContent { padding:10px 20px 8px; font-size:15px; font-weight:700; color:var(--fg); line-height:1.8; text-align:left; }
-#aboutContent p { margin:8px 0; }
+.about-head { padding:16px 20px 10px; border-bottom:1px solid var(--border); font-size:18px; font-weight:700; color:var(--fg); }
+#aboutContent { padding:12px 22px 10px; font-size:15px; font-weight:700; color:var(--fg); line-height:1.8; text-align:left; }
+#aboutContent p { margin:10px 0; }
 #aboutContent a { color:var(--accent); font-weight:700; word-break:break-all; }
 @media (prefers-color-scheme: dark) {
   :root:not(.theme-light) #aboutContent { color:var(--fg); }
@@ -175,6 +184,8 @@ body {
 .const-layout.reflow { height:clamp(280px,52vh,520px); }
 .const-layout.reflow .const-side { gap:8px; justify-content:flex-start; }
 .const-layout.reflow .temp-card { padding:8px 12px; flex:1; display:flex; flex-direction:column; justify-content:center; }
+/* 实时温度卡片的阶段计时 (灰色小字) */
+.rf-clock { margin-top:4px; font-size:clamp(11px,0.9vw,14px); color:var(--fg2); font-variant-numeric:tabular-nums; letter-spacing:0.5px; }
 .const-chart { flex:1; min-width:0; background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:8px; box-sizing:border-box; height:100%; }
 .const-chart canvas { width:100%!important; height:100%!important; display:block; }
 .const-side { width:170px; flex-shrink:0; display:flex; flex-direction:column; justify-content:space-around; }
@@ -235,11 +246,11 @@ body {
 #updBadge.upd-new{background:#ffd9d6!important;color:#c9302c!important;border:1px solid #ffb3ae!important;cursor:pointer!important;}
 /* 右下角提醒卡片 */
 #toastStack{position:fixed;right:14px;bottom:14px;z-index:3000;display:flex;flex-direction:column;gap:8px;align-items:flex-end;pointer-events:none;}
-.toast{min-width:210px;max-width:300px;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,0.22);padding:9px 12px 11px;pointer-events:auto;position:relative;overflow:hidden;transform:translateX(calc(100% + 24px));transition:transform .28s ease,opacity .28s ease;}
+.toast{min-width:230px;max-width:330px;background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,0.22);padding:12px 16px 14px;pointer-events:auto;position:relative;overflow:hidden;transform:translateX(calc(100% + 24px));transition:transform .28s ease,opacity .28s ease;}
 .toast.show{transform:translateX(0);}
 .toast.hide{transform:translateX(calc(100% + 24px));opacity:0;}
-.toast-title{font-size:13px;font-weight:600;}
-.toast-msg{font-size:12px;color:var(--fg2);margin-top:2px;word-break:break-all;}
+.toast-title{font-size:14px;font-weight:600;}
+.toast-msg{font-size:13px;color:var(--fg2);margin-top:4px;word-break:break-all;line-height:1.5;}
 .toast-bar{position:absolute;left:0;bottom:0;height:3px;width:100%;transform-origin:left;animation-name:toastbar;animation-timing-function:linear;animation-fill-mode:forwards;background:var(--accent);}
 @keyframes toastbar{from{transform:scaleX(1);}to{transform:scaleX(0);}}
 .toast.success .toast-title{color:var(--green);}
@@ -327,7 +338,7 @@ body {
 <body>
 <div class="header">
   <div style="display:flex;align-items:center;gap:10px;">
-    <span id="updBadge">V0.5.1</span>
+    <span id="updBadge">V0.5.2</span>
     <button class="page-btn" id="btnAbout">关于</button>
   </div>
   <div style="display:flex;align-items:center;gap:10px;">
@@ -406,23 +417,24 @@ body {
           <canvas id="curveCanvas" width="600" height="220"></canvas>
         </div>
         <div class="const-side">
-          <div class="temp-card" style="flex:0 0 auto;">
+          <div class="temp-card" id="rfClockCard" style="flex:1.6;">
             <div class="temp-label">实时温度</div>
             <div><span class="temp-big" id="curTempR">--.-</span><span class="temp-unit">℃</span></div>
+            <div class="rf-clock" id="rfClock">--:--</div>
           </div>
-          <div class="temp-card">
+          <div class="temp-card" style="flex:0.75;">
             <div class="temp-label">阶段1 预热</div>
             <div class="target-val" id="rfPhase1">-- ℃ / --s</div>
           </div>
-          <div class="temp-card">
+          <div class="temp-card" style="flex:0.75;">
             <div class="temp-label">阶段2 恒温</div>
             <div class="target-val" id="rfPhase2">-- ℃ / --s</div>
           </div>
-          <div class="temp-card">
+          <div class="temp-card" style="flex:0.75;">
             <div class="temp-label">阶段3 回流</div>
             <div class="target-val" id="rfPhase3">-- ℃ / --s</div>
           </div>
-          <div class="temp-card" id="rfPhase4">
+          <div class="temp-card" id="rfPhase4" style="flex:0.75;">
             <div class="temp-label">阶段4 冷却</div>
             <div class="target-val" style="font-size:clamp(12px,1vw,16px);">回落至常温</div>
           </div>
@@ -580,14 +592,25 @@ body {
 </div>
 <div id="toastStack"></div>
 
+<div id="cfmOverlay">
+  <div id="cfmModal">
+    <div class="modal-head" id="cfmTitle">确认操作</div>
+    <div class="modal-body" id="cfmMsg">确定执行该操作?</div>
+    <div class="modal-foot">
+      <button class="btn" id="cfmCancel">取消</button>
+      <button class="btn btn-danger" id="cfmOk">确定</button>
+    </div>
+  </div>
+</div>
+
 <div id="aboutOverlay">
   <div id="aboutModal">
-    <div style="padding:14px 18px 6px;border-bottom:1px solid var(--border);font-size:15px;font-weight:600;">关于</div>
+    <div class="about-head">关于</div>
     <div id="aboutContent">
       <!-- ════════════════════════════════════════════════════════
            "关于"窗口内容: 直接在下面增删 <p>文字</p> 即可, 支持多行
            ════════════════════════════════════════════════════════ -->
-      <p>AiPi 加热台上位机 V0.5</p>
+      <p>AiPi 加热台上位机 V0.5.2</p>
       <p><b>特别感谢：</b></p>
       <p>1. 感谢安信可科技的园长爱笑。</p>
       <p>2. 感谢 SGL 开源作者 LiShanwen 及 SGL 开源团队的每一位贡献者 —— 开源仓库：<a href="https://github.com/sgl-org/sgl" target="_blank" rel="noopener">https://github.com/sgl-org/sgl</a></p>
@@ -600,7 +623,7 @@ body {
            "关于"窗口内容结束
            ════════════════════════════════════════════════════════ -->
     </div>
-    <div style="padding:14px 18px;">
+    <div style="padding:14px 20px 16px;">
       <button class="btn btn-primary" id="aboutClose" style="width:100%;">关闭</button>
     </div>
   </div>
@@ -632,7 +655,7 @@ document.addEventListener('keydown',e=>{
 
 
 // ---- Check for updates (GitHub Releases) ----
-const APP_VERSION='V0.5.1';
+const APP_VERSION='V0.5.2';
 const UPDATE_URL='https://github.com/hsb689/aipiPC/releases/latest';
 function setUpdBadge(state, tag){
   const el=document.getElementById('updBadge'); if(!el) return;
@@ -807,9 +830,9 @@ function parseSummary(b){
     const d=b.slice(o+2,o+2+flen);
     try{
     switch(fid){
-      case SID.CUR_TEMP: if(flen>=2){const v=d[0]|(d[1]<<8);$('curTemp').textContent=v;const er=$('curTempR');if(er)er.textContent=v;checkTempWarnings(v);} break;
+      case SID.CUR_TEMP: if(flen>=2){const v=d[0]|(d[1]<<8);$('curTemp').textContent=v;const er=$('curTempR');if(er)er.textContent=v;calibrateReflowPhase(v);checkTempWarnings(v);} break;
       case SID.SET_TEMP: if(flen>=2){const v=d[0]|(d[1]<<8);$('setTemp').textContent=v+' ℃';$('cvTarget').textContent=v;} break;
-      case SID.HEATER: heating=d[0]===1; updateHeatBtn(); if(heating){heatWatch.maxTemp=null;heatWatch.lastRise=Date.now();reflowSeconds=0;} updateReflowPhase(); break;
+      case SID.HEATER: {const was=heating; heating=d[0]===1; updateHeatBtn(); if(heating&&!was){heatWatch.maxTemp=null;heatWatch.lastRise=Date.now();reflowSeconds=0;} updateReflowPhase();} break;
       case SID.MODE: workMode=d[0]; updateModeUI(); break;
       case SID.WORK_SEC: if(flen>=4){reflowSeconds=(d[0]|(d[1]<<8)|(d[2]<<16)|(d[3]<<24))>>>0;updateReflowPhase();} break;
       case SID.VIN: if(flen>=2){const v=(d[0]|(d[1]<<8))/100;$('vIn').textContent=v.toFixed(2)+' V';} break;
@@ -892,11 +915,57 @@ function getReflowPhase(){
   if(reflowSeconds<ptt+ktt+rtt)return 'reflow';
   return 'cool';
 }
+// 中途连接时的阶段校准: 设备不回传已运行时长, HEATER=1 会把 reflowSeconds 清零,
+// 导致时间模型永远从预热段算起。首次同步(尚未确认过阶段)时用当前温度对照各段
+// 目标温度校准, 并把秒数对齐到该段起点。
+// 注意 PID 控温存在超调: 温度略高于某段目标不代表已进入下一阶段, 仍可能在控温。
+// 因此用容差带 OV_BAND 判定: 只有明显高于目标 OV_BAND ℃ 以上才算越段。
+// 例: 预热80℃/恒温130℃, 温度 132℃ 可能只是恒温段超调 → 判恒温; 145℃ 且还在爬 → 已越段。
+const OV_BAND=8;   // 超调容差(℃): 高出目标 8℃ 以上不可能是正常超调
+function calibrateReflowPhase(v){
+  if(workMode!==1||!heating||reflowPhaseSynced)return;
+  const pt=rd('iRfPT'),kt=rd('iRfKT'),rt=rd('iRfRT');
+  const ptt=rd('iRfPTT')||60,ktt=rd('iRfKTT')||60,rtt=rd('iRfRTT')||30;
+  if(!pt||!kt||!rt)return;   // 配置未同步完, 等下一条温度
+  let ph; let sec;
+  if(v>=rt){ ph='reflow'; sec=ptt+ktt; }          // 已达回流目标温度 → 回流段
+  else if(v>=kt+OV_BAND){ ph='reflow'; sec=ptt+ktt; } // 明显越过恒温目标 → 回流爬温
+  else if(v>=kt-OV_BAND){ ph='keep'; sec=ptt; }   // 恒温目标附近(含超调) → 仍在恒温段控温
+  else { ph='preheat'; sec=0; }
+  reflowSeconds=sec;
+  if(ph!==reflowPhase&&ph===reflowPhaseCandidate&&Date.now()-reflowPhaseCandidateSince>=1500){
+    // 校准结果连续稳定 1.5s: 直接确认, 走统一确认逻辑弹"当前处于X段"
+    reflowPhase=ph; reflowPhaseCandidate='';
+    reflowPhaseSynced=true;
+    const name=PHASE_DEFS[ph][0];
+    const info={preheat:pt+'℃ / '+ptt+'s',keep:kt+'℃ / '+ktt+'s',reflow:rt+'℃ / '+rtt+'s',cool:'停热回落至常温'}[ph];
+    toast('info','当前处于'+name+'段',info,{key:'phase-'+ph+'-sync',cooldown:8000});
+  }
+  updateReflowPhase();
+}
+/* 实时温度卡片上的阶段计时: 显示当前已确认阶段已进行的时间, 换阶段归零重新计时 */
+let rfClockPhase='', rfClockTick=null, rfClockSec=0;
+function updateRfClock(ph){
+  const el=$('rfClock'); if(!el)return;
+  if(ph!==rfClockPhase){ rfClockPhase=ph; rfClockSec=0; }   // 换阶段: 从0重新计时
+  if(!ph){ el.textContent='--:--'; if(rfClockTick){clearInterval(rfClockTick);rfClockTick=null;} return; }
+  if(!rfClockTick){
+    rfClockTick=setInterval(()=>{
+      if(!getReflowPhase()){rfClockSec=0;return;}
+      rfClockSec++;
+      const e=$('rfClock'); if(e)e.textContent=String(Math.floor(rfClockSec/60)).padStart(2,'0')+':'+String(rfClockSec%60).padStart(2,'0');
+    },1000);
+  }
+  el.textContent=String(Math.floor(rfClockSec/60)).padStart(2,'0')+':'+String(rfClockSec%60).padStart(2,'0');
+}
 function updateReflowPhase(){
   const ph=getReflowPhase();
+  updateRfClock(ph);
   // 卡片高亮跟随"已确认"阶段
   for(const k in PHASE_DEFS){
-    const el=$(PHASE_DEFS[k][1]); if(el)el.classList.toggle('phase-active',k===reflowPhase);
+    // rfPhase1/2/3 是卡片内部的 target-val 文本节点, 高亮类须加到外层 .temp-card 上
+    const el=$(PHASE_DEFS[k][1]); const card=el?(el.closest('.temp-card')||el):null;
+    if(card)card.classList.toggle('phase-active',k===reflowPhase);
   }
   if(ph===reflowPhase){
     reflowPhaseCandidate='';
@@ -1177,8 +1246,19 @@ $('btnTcomp').addEventListener('click',()=>{
 $('btnAoff').addEventListener('click',()=>{
   writeCmd(CMD.SET_ASHUT,u32(rd('iAoff')),'自动关机');
 });
-$('btnReset').addEventListener('click',()=>{
-  if(!confirm('确定恢复出厂设置?'))return;
+// 自定义确认弹窗 (替代浏览器原生 confirm): Promise 风格, 确定返回 true
+let cfmResolve=null;
+function askConfirm(title,msg){
+  $('cfmTitle').textContent=title; $('cfmMsg').textContent=msg;
+  $('cfmOverlay').style.display='flex';
+  return new Promise(r=>{cfmResolve=r;});
+}
+function cfmDone(v){ $('cfmOverlay').style.display='none'; if(cfmResolve){cfmResolve(v);cfmResolve=null;} }
+$('cfmOk').addEventListener('click',()=>cfmDone(true));
+$('cfmCancel').addEventListener('click',()=>cfmDone(false));
+$('cfmOverlay').addEventListener('click',e=>{if(e.target===$('cfmOverlay'))cfmDone(false);});
+$('btnReset').addEventListener('click',async()=>{
+  if(!await askConfirm('恢复出厂设置','所有参数将恢复为默认值并保存到 Flash, 确定继续?'))return;
   writeCmd(CMD.LOAD_DEFAULT,[],'恢复出厂设置');
 });
 
@@ -1760,8 +1840,8 @@ window.addEventListener('beforeunload', () => { try { if (serial.isOpen) serial.
 
 <div id="scanOverlay">
   <div id="scanModal">
-    <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
-      <span style="font-size:15px;font-weight:600;">选择蓝牙设备</span>
+    <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+      <span style="font-size:16px;font-weight:700;">选择蓝牙设备</span>
       <span id="scanSpinner" style="font-size:12px;color:var(--fg2);"></span>
     </div>
     <div id="scanList" style="max-height:300px;overflow-y:auto;padding:4px 0;"></div>
@@ -1773,8 +1853,8 @@ window.addEventListener('beforeunload', () => { try { if (serial.isOpen) serial.
 
 <div id="fwScanOverlay">
   <div id="fwScanModal">
-    <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
-      <span style="font-size:15px;font-weight:600;">选择串口设备</span>
+    <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+      <span style="font-size:16px;font-weight:700;">选择串口设备</span>
       <span id="fwScanSpinner" style="font-size:12px;color:var(--fg2);"></span>
     </div>
     <div id="fwScanList" style="max-height:300px;overflow-y:auto;padding:4px 0;"></div>
