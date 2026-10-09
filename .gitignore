@@ -17,3 +17,19 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+# Tauri Android: 编译产物不入库(工程源码保留)
+gen/android/.gradle/
+gen/android/build/
+gen/android/app/build/
+gen/android/buildSrc/build/
+gen/android/buildSrc/.gradle/
+gen/android/local.properties
+gen/android/.idea/
+gen/android/captures/
+gen/android/app/src/main/jniLibs/**/*.so
+gen/android/app/libs/*.jar
+*.apk
+
+# 临时/调试文件
+_rg.json

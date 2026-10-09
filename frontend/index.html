@@ -1,9 +1,15 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AiPi 加热台 BLE 上位机</title>
+<script>
+// 手机端 (Android/iOS WebView) 跳转到独立的手机 UI; 桌面保持原页面
+if (/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent)) {
+  location.replace('mobile.html');
+}
+</script>
 <style>
 :root {
   --bg: #ffffff; --bg2: #f5f5f7; --bg3: #e8e8ed;
@@ -333,12 +339,121 @@ body {
 .fw-card { margin-bottom:0; }
 #pageFw .fw-log { height:260px; }
 @media (max-width:1100px){ #pageFw .fw-layout { grid-template-columns:1fr; } }
+/* ============ 手机竖屏布局 (≤700px): 沉浸式顶栏 + 抽屉菜单 + 底部模式条 ============ */
+.mobile-only { display:none; }
+/* 抽屉菜单 (手机端专用, 桌面隐藏) */
+#drawer {
+  position:fixed; top:0; left:0; bottom:0; width:280px; max-width:80vw; z-index:1500;
+  background:var(--bg2); border-right:1px solid var(--border);
+  transform:translateX(-105%); transition:transform .25s ease;
+  display:flex; flex-direction:column; padding:20px 16px;
+  padding-top:calc(20px + env(safe-area-inset-top));
+  box-shadow:4px 0 24px rgba(0,0,0,0.25);
+}
+#drawer.open { transform:translateX(0); }
+#drawerMask { position:fixed; inset:0; z-index:1400; background:rgba(0,0,0,0.4); display:none; }
+#drawerMask.open { display:block; }
+.drawer-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+.drawer-close { border:none; background:transparent; color:var(--fg2); font-size:22px; cursor:pointer; padding:4px 8px; }
+.drawer-sec { font-size:11px; font-weight:600; color:var(--fg2); text-transform:uppercase; letter-spacing:0.5px; margin:12px 0 6px; }
+.drawer-row { display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px solid var(--border); font-size:13px; }
+.drawer-row strong { color:var(--fg2); font-weight:400; }
+.drawer-row span { font-weight:500; font-variant-numeric:tabular-nums; }
+.drawer-btns { display:flex; flex-direction:column; gap:8px; margin-top:14px; }
+.drawer-btns .btn { width:100%; padding:10px 0; }
+.drawer-foot { margin-top:auto; font-size:11px; color:var(--fg3); }
+@media (max-width:700px) {
+  body { overflow:auto; height:100vh; font-size:15px; }
+  /* 沉浸式: 顶栏只留汉堡图标, 背景透明与系统状态栏融合 */
+  .header {
+    position:fixed; top:0; left:0; right:0; z-index:1200;
+    background:transparent; border-bottom:none;
+    padding:calc(6px + env(safe-area-inset-top)) 10px 6px;
+    -webkit-app-region:no-drag; pointer-events:none;
+  }
+  .header > div:first-child { pointer-events:auto; }
+  .header .page-btn, .header .status-pill, .header .theme-sel, .header .btn, #updBadge { display:none !important; }
+  #btnDrawer { display:inline-flex !important; pointer-events:auto; }
+  /* 汉堡按钮 */
+  #btnDrawer {
+    align-items:center; justify-content:center;
+    width:40px; height:40px; border:none; border-radius:12px;
+    background:var(--bg3); color:var(--fg); cursor:pointer;
+  }
+  #btnDrawer svg { display:block; }
+  /* 主区: 单列竖排, 顶部避开状态栏 */
+  .main { flex-direction:column; overflow:visible; padding-top:calc(52px + env(safe-area-inset-top)); }
+  .col { padding:10px; overflow:visible; max-width:100%; }
+  .col-left { order:3; flex:none; border-right:none; border-top:1px solid var(--border); }
+  .col-center { order:1; flex:none; }
+  .col-right { order:2; flex:none; border-left:none; border-top:1px solid var(--border); }
+  /* 右栏设置面板直接在正文中显示, 不用 tab (底部模式条决定显示哪个) */
+  .col-right .tab-bar { display:none; }
+  .col-right .card { display:none; }
+  .col-right .card.active { display:block; }
+  /* 恒温/回流布局: 图表在上, 温度信息竖排在下 */
+  .const-layout, .const-layout.reflow { flex-direction:column; height:auto; }
+  .const-chart { height:200px; }
+  .const-layout.reflow .const-chart { height:220px; }
+  .const-side { width:100%; flex-direction:row; flex-wrap:wrap; gap:8px; justify-content:space-between; }
+  .const-side .temp-card { flex:1; min-width:100px; padding:10px; }
+  .const-layout.reflow .const-side .temp-card { flex:1 1 40%; }
+  .const-side .btn, .const-side .progress-bar { width:100%; flex-basis:100%; }
+  .temp-big { font-size:40px; }
+  /* 底部固定区: 加热按钮 + 模式切换条 */
+  #mobileBottomBar {
+    position:fixed; left:0; right:0; bottom:0; z-index:900;
+    display:flex; flex-direction:column; gap:8px;
+    padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+    background:var(--bg2); border-top:1px solid var(--border);
+    box-shadow:0 -4px 16px rgba(0,0,0,0.18);
+  }
+  #mobileBottomBar .btn { width:100%; padding:13px 0; font-size:16px; border-radius:12px; }
+  #mobileModeBar { display:flex; gap:8px; }
+  #mobileModeBar .mode-btn { flex:1; padding:10px 0; font-size:14px; border-radius:10px; text-align:center; }
+  /* 给底部栏留出滚动空间 */
+  .col-center, .col-left { padding-bottom:150px; }
+  .pageFw .fw-layout, #pageFw .fw-layout { grid-template-columns:1fr; }
+  /* 弹窗适配小屏 */
+  #scanModal, #fwScanModal, #aboutModal, #cfmModal { max-width:92vw; }
+  #toastStack { right:10px; bottom:150px; }
+  .toast { max-width:calc(100vw - 40px); }
+}
 </style>
 </head>
 <body>
+<button id="btnDrawer" class="page-btn" aria-label="菜单" style="display:none;">
+  <svg width="20" height="20" viewBox="0 0 20 20"><path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+</button>
+<div id="drawerMask"></div>
+<div id="drawer">
+  <div class="drawer-head">
+    <strong style="font-size:16px;">菜单</strong>
+    <button class="drawer-close" id="btnDrawerClose">✕</button>
+  </div>
+  <div class="drawer-sec">连接</div>
+  <div class="drawer-row"><strong>状态</strong><span id="drawerConn">未连接</span></div>
+  <div class="drawer-row"><strong>设备</strong><span id="drawerDev">-</span></div>
+  <div class="drawer-btns">
+    <button class="btn btn-primary" id="btnDrawerConn">连接设备</button>
+    <button class="btn btn-ghost" id="btnDrawerFw">固件更新</button>
+  </div>
+  <div class="drawer-sec">电气参数</div>
+  <div class="drawer-row"><strong>输入电压</strong><span id="dVIn">-- V</span></div>
+  <div class="drawer-row"><strong>实时功率</strong><span id="dPwr">-- W</span></div>
+  <div class="drawer-row"><strong>输出电压</strong><span id="dVOut">-- V</span></div>
+  <div class="drawer-row"><strong>输出电流</strong><span id="dIOut">-- mA</span></div>
+  <div class="drawer-sec">外观</div>
+  <select id="drawerTheme" class="theme-sel" style="width:100%;">
+    <option value="auto">跟随系统</option>
+    <option value="light">浅色</option>
+    <option value="dark">深色</option>
+  </select>
+  <div class="drawer-foot" id="drawerVer">V0.5.2</div>
+</div>
 <div class="header">
   <div style="display:flex;align-items:center;gap:10px;">
-    <span id="updBadge">V0.5.2</span>
+    <span id="updBadge">V1.0.0</span>
     <button class="page-btn" id="btnAbout">关于</button>
   </div>
   <div style="display:flex;align-items:center;gap:10px;">
@@ -528,6 +643,7 @@ body {
   </div>
 </div>
 <div class="main hidden-page" id="pageFw">
+  <div id="mobileBottomBar" style="display:none;"></div>
   <div class="col">
     <div class="fw-layout">
       <div class="card fw-card">
@@ -655,7 +771,7 @@ document.addEventListener('keydown',e=>{
 
 
 // ---- Check for updates (GitHub Releases) ----
-const APP_VERSION='V0.5.2';
+const APP_VERSION='V1.0.0';
 const UPDATE_URL='https://github.com/hsb689/aipiPC/releases/latest';
 function setUpdBadge(state, tag){
   const el=document.getElementById('updBadge'); if(!el) return;
@@ -1197,6 +1313,74 @@ async function toggleHeat(){
 }
 $('btnHeat').addEventListener('click',toggleHeat);
 $('btnHeatR').addEventListener('click',toggleHeat);
+
+// 手机端: 汉堡抽屉菜单 + 底部固定栏(加热按钮 + 模式切换条)
+(function(){
+  const $id=id=>document.getElementById(id);
+  const mq=window.matchMedia('(max-width:700px)');
+  // --- 底部栏结构 ---
+  const bar=$id('mobileBottomBar');
+  if(bar){
+    const clone=document.createElement('button');
+    clone.className='btn btn-primary'; clone.textContent='开启加热';
+    clone.addEventListener('click',toggleHeat);
+    const modeBar=document.createElement('div');
+    modeBar.id='mobileModeBar';
+    const mc=document.createElement('button');
+    mc.className='mode-btn active'; mc.textContent='恒温';
+    mc.addEventListener('click',()=>{ $id('modeConst').click(); });
+    const mr=document.createElement('button');
+    mr.className='mode-btn'; mr.textContent='回流焊';
+    mr.addEventListener('click',()=>{ $id('modeReflow').click(); });
+    modeBar.appendChild(mc); modeBar.appendChild(mr);
+    bar.appendChild(clone); bar.appendChild(modeBar);
+    function syncBtn(){
+      const src=$id('btnHeat');
+      clone.textContent=src.textContent;
+      clone.className=src.className;
+    }
+    function syncMode(){
+      mc.classList.toggle('active',workMode===0);
+      mr.classList.toggle('active',workMode===1);
+      modeBar.style.display=$id('viewReflow').style.display==='none'?'flex':'none';
+    }
+    const origUpd=updateHeatBtn;
+    updateHeatBtn=function(){origUpd();syncBtn();};
+    const origMode=updateModeUI;
+    updateModeUI=function(){origMode();syncMode();};
+    function layout(){ bar.style.display=mq.matches?'flex':'none'; if(mq.matches){syncBtn();syncMode();} }
+    mq.addEventListener('change',layout);
+    layout();
+  }
+  // --- 抽屉 ---
+  const drawer=$id('drawer'),mask=$id('drawerMask'),btn=$id('btnDrawer');
+  function openDrawer(){ drawer.classList.add('open'); mask.classList.add('open'); }
+  function closeDrawer(){ drawer.classList.remove('open'); mask.classList.remove('open'); }
+  btn.addEventListener('click',openDrawer);
+  $id('btnDrawerClose').addEventListener('click',closeDrawer);
+  mask.addEventListener('click',closeDrawer);
+  function layoutDrawer(){ btn.style.display=mq.matches?'inline-flex':'none'; if(!mq.matches)closeDrawer(); }
+  mq.addEventListener('change',layoutDrawer);
+  layoutDrawer();
+  // 抽屉内按钮 → 复用桌面逻辑
+  $id('btnDrawerConn').addEventListener('click',()=>{ closeDrawer(); $id('btnConn').click(); });
+  $id('btnDrawerFw').addEventListener('click',()=>{ closeDrawer(); $id('btnPageFw').click(); });
+  // 主题选择与桌面下拉同步
+  const dTheme=$id('drawerTheme'),hTheme=$id('themeSel');
+  dTheme.addEventListener('change',()=>{ hTheme.value=dTheme.value; hTheme.dispatchEvent(new Event('change')); });
+  hTheme.addEventListener('change',()=>{ dTheme.value=hTheme.value; });
+  dTheme.value=hTheme.value;
+  // 抽屉数据同步 (电气参数/连接状态, 跟随桌面栏刷新)
+  const map=[['vIn','dVIn'],['pwr','dPwr'],['vOut','dVOut'],['iOut','dIOut']];
+  setInterval(()=>{
+    if(!mq.matches)return;
+    map.forEach(([a,b])=>{ const s=$id(a),d=$id(b); if(s&&d)d.textContent=s.textContent; });
+    const ct=$id('connText'),dc=$id('drawerConn');
+    if(ct&&dc)dc.textContent=ct.textContent;
+    const dev=$id('infoDev'),dd=$id('drawerDev');
+    if(dev&&dd)dd.textContent=dev.textContent;
+  },1000);
+})();
 
 // Mode switch
 $('modeConst').addEventListener('click',()=>{workMode=0;updateModeUI();writeCmd(CMD.SET_WORK_MODE,[0],'切恒温');});

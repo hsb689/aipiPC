@@ -4,6 +4,10 @@ version = "1.0.0"
 description = "AiPi 加热台 BLE 上位机"
 edition = "2021"
 
+[lib]
+name = "aipi_heater_upper_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
@@ -16,6 +20,12 @@ tokio = { version = "1", features = ["full"] }
 uuid = "1"
 anyhow = "1"
 futures = "0.3"
+log = "0.4"
+
+[target.'cfg(target_os = "android")'.dependencies]
+jni = "0.19"
+jni-utils = "0.1"
+android_logger = "0.13"
 
 [features]
 default = ["custom-protocol"]
