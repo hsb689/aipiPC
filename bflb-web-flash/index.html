@@ -59,8 +59,7 @@
         <button id="btn-disconnect" class="btn ghost" disabled>断开</button>
         <span id="port-label" class="port-label">未连接</span>
       </div>
-
-      <p class="hint">
+你      <p class="hint">
         波特率 = <b>工作波特率</b>(烧录速率)。BL616/618 已按官方 bflb_iot_tool 两段式流程实现:
         先以 <b>500000</b>(官方 speed_uart_boot) 与 bootrom 握手读 bootinfo, 再通过 clk_set(0x22)
         升频到工作波特率高速烧录 —— 2M 握手不可靠(bootrom 内部 RC 时钟)正是部分 CH340K

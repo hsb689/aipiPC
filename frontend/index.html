@@ -6,8 +6,8 @@
 <title>AiPi 加热台 BLE 上位机</title>
 <script>
 // 手机端 (Android/iOS WebView) 跳转到独立的手机 UI; 桌面保持原页面
-if (/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent)) {
-  location.replace('mobile.html');
+  if (/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent)) {
+    location.replace('mobile.html?v=' + Date.now());
 }
 </script>
 <style>

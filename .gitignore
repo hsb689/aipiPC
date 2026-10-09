@@ -33,3 +33,10 @@ gen/android/app/libs/*.jar
 
 # 临时/调试文件
 _rg.json
+
+# 临时调试文件
+/_apkchk/
+/_*.cjs
+/_embedded_*.html
+/_embedded_*.js
+/tauri-build.log

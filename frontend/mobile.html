@@ -168,8 +168,8 @@ canvas{width:100%;display:block;}
         <div class="lbl">实测温度</div>
         <div><span class="t" id="curTemp">--</span><span class="u">℃</span></div>
         <div class="kv" style="margin-top:10px;"><div class="l">目标温度</div><div class="v g" id="setTemp">-- ℃</div></div>
-        <div style="height:6px;border-radius:3px;background:var(--card2);margin-top:10px;overflow:hidden;">
-          <div id="bar" style="height:100%;width:0%;background:var(--accent);transition:width .3s;"></div>
+        <div style="height:8px;border-radius:4px;background:var(--card2);margin-top:10px;overflow:hidden;">
+          <div id="bar" style="height:100%;width:0%;border-radius:4px;background:linear-gradient(90deg,#ff8c1a,var(--accent));transition:width .3s;"></div>
         </div>
       </div>
     </div>
@@ -423,12 +423,64 @@ async function writeCmd(cmdId,payload,label){
   catch(e){toast('发送失败: '+label);return false;}
 }
 /* ===== 通知解析 (与桌面版 parseSummary 一致: 实时帧+配置帧全处理) ===== */
+/* ===== 拼包重组层: 设备按 ≤20 字节分片发送长帧, 这里按 [type][id][len] 帧头重新拼帧 =====
+   兼容整帧输入(MTU 协商成功时设备发整帧, 重组层直接透传) */
+let rxBuf=new Uint8Array(0);
+let rxCleanTimer=null;
+function feedNotify(data){
+  const chunk=new Uint8Array(data);
+  const m=new Uint8Array(rxBuf.length+chunk.length);
+  m.set(rxBuf);m.set(chunk,rxBuf.length);rxBuf=m;
+  /* 超时兜底: 分片丢失导致缓冲残缺时清空, 不让后续帧永远卡住 */
+  if(rxCleanTimer)clearTimeout(rxCleanTimer);
+  rxCleanTimer=setTimeout(()=>{rxBuf=new Uint8Array(0);},800);
+  while(rxBuf.length>=3){
+    const len=rxBuf[2],total=3+len;
+    if(len>260){rxBuf=new Uint8Array(0);return;}
+    if(rxBuf.length<total)break;
+    const frame=rxBuf.slice(0,total);
+    rxBuf=rxBuf.slice(total);
+    try{onNotify(frame);}catch(e){}
+  }
+  if(rxBuf.length===0&&rxCleanTimer){clearTimeout(rxCleanTimer);rxCleanTimer=null;}
+}
+/* 单值回显帧解析 (与桌面版 parseConfigSingle 同款): 每条写入命令后设备的当前值回显 */
+function parseConfigSingle(b){
+  const id=b[1],d=b.slice(3,3+b[2]);
+  const vU16=()=>d.length>=2?(d[0]|(d[1]<<8)):null;
+  const vU32=()=>d.length>=4?(d[0]|(d[1]<<8)|(d[2]<<16)|(d[3]<<24))>>>0:null;
+  try{
+    switch(id){
+      case CMD.SET_TARGET_TEMP:{const v=vU16();if(v!=null){$id('setTemp').textContent=v+' ℃';$id('iTarget').value=v;}}break;
+      case CMD.SET_PRESET1:{const v=vU16();if(v!=null){$id('p1v').textContent=v;$id('cvP1').textContent=v;$id('iPres1').value=v;}}break;
+      case CMD.SET_PRESET2:{const v=vU16();if(v!=null){$id('p2v').textContent=v;$id('cvP2').textContent=v;$id('iPres2').value=v;}}break;
+      case CMD.SET_PRESET3:{const v=vU16();if(v!=null){$id('p3v').textContent=v;$id('cvP3').textContent=v;$id('iPres3').value=v;}}break;
+      case CMD.RF_PREHEAT_T:{const v=vU16();if(v!=null)$id('iRfPT').value=v;}break;
+      case CMD.RF_PREHEAT_TM:{const v=vU16();if(v!=null)$id('iRfPTT').value=v;}break;
+      case CMD.RF_KEEP_T:{const v=vU16();if(v!=null)$id('iRfKT').value=v;}break;
+      case CMD.RF_KEEP_TM:{const v=vU16();if(v!=null)$id('iRfKTT').value=v;}break;
+      case CMD.RF_REFLOW_T:{const v=vU16();if(v!=null)$id('iRfRT').value=v;}break;
+      case CMD.RF_REFLOW_TM:{const v=vU16();if(v!=null)$id('iRfRTT').value=v;}break;
+      case CMD.PID_KP:{if(d.length>=4){const v=f32r(d);$id('cvKp').textContent=v.toFixed(2);$id('iKp').value=v.toFixed(2);}}break;
+      case CMD.PID_KI:{if(d.length>=4){const v=f32r(d);$id('cvKi').textContent=v.toFixed(2);$id('iKi').value=v.toFixed(2);}}break;
+      case CMD.PID_KD:{if(d.length>=4){const v=f32r(d);$id('cvKd').textContent=v.toFixed(2);$id('iKd').value=v.toFixed(2);}}break;
+      case CMD.POWER_LIMIT:{const v=vU16();if(v!=null){$id('cvPlim').textContent=v;$id('iPlim').value=v;}}break;
+      case CMD.SET_TCOMP:{const v=vU16();if(v!=null){const s=v>0x7FFF?v-0x10000:v;$id('cvTcomp').textContent=s;$id('iTcomp').value=s;}}break;
+      case CMD.SET_ASHUT:{const v=vU32();if(v!=null){$id('cvAoff').textContent=v;$id('iAoff').value=v;}}break;
+      case CMD.FAN_PWM:{if(d.length>=1){$id('cvFanPwm').textContent=d[0]+'%';$id('iFanPwm').value=d[0];}}break;
+      case CMD.LED_BRIGHT:{if(d.length>=1){$id('cvLed').textContent=d[0]+'%';$id('iLed').value=d[0];}}break;
+      case CMD.FAN_MODE:{if(d.length>=1&&d[0]<=1){$id('cvFanMode').textContent=d[0]===1?'降温':'散热';$id('iFanMode').value=String(d[0]);}}break;
+      case CMD.SET_HEATER:{heating=d[0]===1;updHeat();}break;
+    }
+  }catch(e){}
+}
 function onNotify(data){
   const b=new Uint8Array(data);
-  console.log('[BLE] notify type=' + b[0] + ' id=' + b[1] + ' len=' + b.length);
   /* 首帧可视化诊断: 屏幕上确认数据链路是否打通 */
   if(!onNotify._seen){onNotify._seen=true;toast('已接收到设备数据帧 type='+b[0]+' id='+b[1]);}
   const type=b[0],id=b[1];
+  /* 单值回显帧(type 0x10~0x14): 之前被丢弃, 导致写入后的"当前值"永远不更新 */
+  if(type>=DT.U8&&type<=DT.FLOAT){parseConfigSingle(b);return;}
   if(type>=DT.U8&&type<=DT.FLOAT){parseCfgSingle(id,b);return;}   // 单项配置回执 (PID/风扇/LED等的当前值来源)
   if(type!==DT.STATUS)return;
   if(!STATUS_IDS.includes(id))return;
@@ -443,9 +495,9 @@ function onNotify(data){
       case SID.CUR_TEMP:{const v=vU16();if(v!=null){$id('curTemp').textContent=v;$id('curTempR').textContent=v;
         tempHist.push({t:Date.now(),v});if(tempHist.length>1500)tempHist.shift();drawChart();updReflowUI();}}break;
       case SID.SET_TEMP:{const v=vU16();if(v!=null)$id('setTemp').textContent=v+' ℃';}break;
-      case SID.HEATER:{heating=d[0]===1;updHeat();if(heating)reflowSeconds=0;}break;
+      case SID.HEATER:{const n=d[0]===1;if(heating!==n){heating=n;if(heating)reflowSeconds=0;}updHeat();}break;
       case SID.MODE:{workMode=d[0]===1?1:0;updMode();}break;
-      case SID.WORK_SEC:{const v=vU32();if(v!=null)reflowSeconds=v;}break;
+      case SID.WORK_SEC:{const v=vU32();if(v!=null){reflowSeconds=v;updReflowUI();}}break;
       case SID.VIN:{const v=vU16();if(v!=null){$id('dVin').textContent=(v/100).toFixed(2)+' V';$id('kVin').textContent=(v/100).toFixed(2)+' V';}}break;
       case SID.PWR:{const v=vU16();if(v!=null){$id('dPwr').textContent=(v/100).toFixed(1)+' W';$id('kPwr').textContent=(v/100).toFixed(1)+' W';}}break;
       case SID.VOUT:{const v=vU16();if(v!=null)$id('dVout').textContent=(v/100).toFixed(2)+' V';calcRes();}break;
@@ -545,30 +597,46 @@ function updReflowUI(){
 /* ===== 曲线绘制 (带时间窗档位) ===== */
 function drawChart(){
   const cv=$id(workMode===0?'chart':'chartR');
-  if(!cv||!cv.offsetParent)return;
+  if(!cv||!cv.offsetParent){return;}
   const ctx=cv.getContext('2d');
   const W=cv.width,H=cv.height;
   ctx.clearRect(0,0,W,H);
   if(workMode===1){drawReflowChart(ctx,W,H);return;}
-  if(tempHist.length<2)return;
   const now=Date.now(),span=spanMin*60000;
-  const pts=tempHist.filter(p=>now-p.t<=span);
-  if(pts.length<2)return;
-  const vs=pts.map(p=>p.v);
+  const ptsAll=tempHist.filter(p=>now-p.t<=span);
   const tg=parseFloat($id('setTemp').textContent)||0;
-  let lo=Math.min(...vs,30,tg>0?tg:30),hi=Math.max(...vs,250,tg>0?tg:30);
-  lo=Math.max(0,Math.floor(lo/50)*50);hi=Math.ceil(hi/50)*50;
-  const x=t=>W-(now-t.t)/span*W, y=v=>H-14-(v-lo)/(hi-lo)*(H-34);
-  ctx.strokeStyle='#232d3a';ctx.fillStyle='#8b98a9';ctx.font='18px sans-serif';ctx.lineWidth=1;
-  for(let g=lo;g<=hi;g+=50){ctx.beginPath();ctx.moveTo(0,y(g));ctx.lineTo(W,y(g));ctx.stroke();ctx.fillText(g+'℃',6,y(g)-4);}
+  const vs=ptsAll.map(p=>p.v);
+  /* Y轴范围: 有数据时包住数据+目标温度, 无数据时按目标温度给默认范围 (未连接也显示坐标轴) */
+  let lo,hi;
+  if(vs.length){lo=Math.min(...vs,tg>0?tg:vs[0]);hi=Math.max(...vs,tg>0?tg:vs[0]);}
+  else if(tg>0){lo=tg-40;hi=tg+20;}
+  else {lo=0;hi=100;}
+  if(hi-lo<40){hi+=20;lo-=20;}
+  const pad=(hi-lo)*0.1;lo-=pad;hi+=pad;
+  const step=hi-lo>200?50:hi-lo>80?20:10;
+  lo=Math.max(0,Math.floor(lo/step)*step);hi=Math.ceil(hi/step)*step;
+  const PL=48,PR=6,PT=8,PB=20;
+  const pw=W-PL-PR,ph=H-PT-PB;
+  /* 时间窗自适应: 数据不足 span 时收缩, 曲线铺满图表 (示波器风格) */
+  const win=Math.min(span,Math.max(30000,now-(ptsAll.length?ptsAll[0].t:now)));
+  const x=t=>PL+pw-(now-t)/win*pw, y=v=>PT+ph-(v-lo)/(hi-lo)*ph;
+  /* 网格+刻度: 无数据也绘制, 空图表也有完整坐标轴 */
+  ctx.strokeStyle='#232d3a';ctx.fillStyle='#8b98a9';ctx.font='13px sans-serif';ctx.lineWidth=1;
+  for(let g=lo;g<=hi;g+=step){
+    ctx.beginPath();ctx.moveTo(PL,y(g));ctx.lineTo(W-PR,y(g));ctx.stroke();
+    ctx.textAlign='right';ctx.fillText(g+'℃',PL-6,y(g)+4);
+  }
+  ctx.textAlign='left';
   /* 目标温度虚线 */
-  if(tg>0){ctx.strokeStyle='#30d158';ctx.setLineDash([8,6]);ctx.beginPath();ctx.moveTo(0,y(tg));ctx.lineTo(W,y(tg));ctx.stroke();ctx.setLineDash([]);}
-  /* 曲线 */
-  ctx.strokeStyle='#ff8c1a';ctx.lineWidth=3;ctx.beginPath();
-  pts.forEach((p,i)=>{i?ctx.lineTo(x(p.t),y(p.v)):ctx.moveTo(x(p.t),y(p.v));});
-  ctx.stroke();
-  const last=pts[pts.length-1];
-  ctx.fillStyle='#ff8c1a';ctx.beginPath();ctx.arc(x(last.t),y(last.v),5,0,7);ctx.fill();
+  if(tg>0){ctx.strokeStyle='#30d158';ctx.setLineDash([8,6]);ctx.beginPath();ctx.moveTo(PL,y(tg));ctx.lineTo(W-PR,y(tg));ctx.stroke();ctx.setLineDash([]);}
+  /* 曲线: 至少 2 个点才绘制 */
+  if(ptsAll.length>=2){
+    ctx.strokeStyle='#ff8c1a';ctx.lineWidth=3;ctx.beginPath();
+    ptsAll.forEach((p,i)=>{i?ctx.lineTo(x(p.t),y(p.v)):ctx.moveTo(x(p.t),y(p.v));});
+    ctx.stroke();
+    const last=ptsAll[ptsAll.length-1];
+    ctx.fillStyle='#ff8c1a';ctx.beginPath();ctx.arc(x(last.t),y(last.v),5,0,7);ctx.fill();
+  }
 }
 /* 回流焊图: 分阶段着色参考曲线(同电脑版: 预热蓝/恒温绿/回流橙) + 实际温度叠加, 未连接也显示参考曲线 */
 function drawReflowChart(ctx,W,H){
@@ -577,14 +645,19 @@ function drawReflowChart(ctx,W,H){
   const coolT=60;
   const total=ptt+ktt+rtt+coolT;
   const hi=Math.ceil((Math.max(pt,kt,rt)+40)/50)*50;
-  const X=t=>t/total*(W-10), Y=v=>H-14-(v/hi)*(H-34);
+  const X=t=>PL+t/total*(W-PR-PL), Y=v=>PT+ph-(v/hi)*ph;
+  /* Y轴刻度画在绘图区左侧外面, 背景色块/网格/曲线不越出右边界 */
+  const PL=48,PR=6,PT=8,PB=18;
+  const pw=W-PL-PR,ph=H-PT-PB;
   /* 阶段背景色块 (同电脑版配色) */
   const bgs=[[0,ptt,'rgba(10,132,255,0.10)'],[ptt,ptt+ktt,'rgba(48,209,88,0.10)'],
     [ptt+ktt,ptt+ktt+rtt,'rgba(255,159,10,0.10)'],[ptt+ktt+rtt,total,'rgba(142,142,147,0.10)']];
-  bgs.forEach(b=>{ctx.fillStyle=b[2];ctx.fillRect(X(b[0]),0,X(b[1])-X(b[0]),H-14);});
+  bgs.forEach(b=>{ctx.fillStyle=b[2];ctx.fillRect(X(b[0]),PT,X(b[1])-X(b[0]),ph);});
   /* 网格 */
-  ctx.strokeStyle='#232d3a';ctx.fillStyle='#8b98a9';ctx.font='16px sans-serif';ctx.lineWidth=1;
-  for(let g=50;g<=hi;g+=50){ctx.beginPath();ctx.moveTo(0,Y(g));ctx.lineTo(W,Y(g));ctx.stroke();ctx.fillText(g+'℃',4,Y(g)-4);}
+  ctx.strokeStyle='#232d3a';ctx.fillStyle='#8b98a9';ctx.font='13px sans-serif';ctx.lineWidth=1;
+  for(let g=50;g<=hi;g+=50){ctx.beginPath();ctx.moveTo(PL,Y(g));ctx.lineTo(W-PR,Y(g));ctx.stroke();
+    ctx.textAlign='right';ctx.fillText(g+'℃',PL-6,Y(g)+4);}
+  ctx.textAlign='left';
   /* 分段着色参考曲线 */
   const segs=[[0,25,ptt,pt,'#0a84ff'],[ptt,pt,ptt+ktt,kt,'#30d158'],
     [ptt+ktt,kt,ptt+ktt+rtt,rt,'#ff8c1a'],[ptt+ktt+rtt,rt,total,50,'#8e8e93']];
@@ -696,7 +769,7 @@ document.querySelectorAll('.spanbar button').forEach(b=>{
   });
 });
 /* BLE 事件 */
-_t.event.listen('ble-notify',e=>onNotify(e.payload));
+_t.event.listen('ble-notify',e=>feedNotify(e.payload));
 _t.event.listen('ble-disconnected',()=>{
   connected=false;heating=false;updHeat();
   setTop('连接断开',false);

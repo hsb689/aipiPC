@@ -468,6 +468,8 @@ class Peripheral {
                 switch (newState) {
                     case BluetoothGatt.STATE_CONNECTED:
                         Peripheral.this.connected = true;
+                        /* negotiate larger MTU so notifications carry full-length frames (>20B) */
+                        gatt.requestMtu(247);
                         break;
                     case BluetoothGatt.STATE_DISCONNECTED:
                         Peripheral.this.connected = false;

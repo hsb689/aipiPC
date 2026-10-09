@@ -253,9 +253,18 @@ async fn ble_connect(
             let list: Vec<String> = chars.iter().map(|c| format!("{}", c.uuid)).collect();
             format!("通知特征9013未发现! 设备实际暴露: {}", list.join(", "))
         })?;
-    let _ = target.unsubscribe(notify_ch).await;
-    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-    target.subscribe(notify_ch).await.map_err(|e| format!("subscribe: {e}"))?;
+    #[cfg(target_os = "android")]
+    {
+        // Android: 先退订再订阅会立刻终结 notifications 流(表现为连上了但永远
+        // 收不到任何数据) —— 设备每 300ms 无条件周期推送, 订阅一次即可
+        target.subscribe(notify_ch).await.map_err(|e| format!("subscribe: {e}"))?;
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = target.unsubscribe(notify_ch).await;
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        target.subscribe(notify_ch).await.map_err(|e| format!("subscribe: {e}"))?;
+    }
     log::info!("[BLE] subscribed notify char OK");
 
     // 通知监听: 流结束 = 断连
@@ -279,11 +288,12 @@ async fn ble_connect(
     let app_health = app.clone();
     let state_health = state.inner().clone();
     tokio::spawn(async move {
-        #[cfg(target_os = "android")]
-        { let _ = ensure_jni_attached(); }
         let mut fails = 0u32;
         loop {
             tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            // tokio 可能在线程间迁移任务, 每次轮询前重新 attach
+            #[cfg(target_os = "android")]
+            { let _ = ensure_jni_attached(); }
             match p_health.is_connected().await {
                 Ok(true) => fails = 0,
                 _ => {
@@ -307,15 +317,8 @@ async fn ble_connect(
     s.connected = true;
     drop(s);
 
-    // 发空包查询, 触发设备回传全部当前值(电脑版同款修复)
-    let p_query = {
-        let s2 = state.lock().await;
-        s2.peripheral.as_ref().map(|p| p.clone())
-    };
-    if let Some(p) = p_query {
-        query_all_config(&p).await;
-    }
-
+    // 注意: 连接后不要发送逐项查询([cmd,0x00]) —— 实测会打断设备的 300ms 周期上报,
+    // 导致只有连接瞬间有数据。设备在连接后 ~2s 会主动补发 7 个配置组快照。
     Ok(name)
 }
 
